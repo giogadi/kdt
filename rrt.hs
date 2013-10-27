@@ -59,7 +59,7 @@ addChildAt (Node l ts) (p:ps) s = let (newChild,idx) = addChildAt (ts `Seq.index
 
 data RRT = RRT
     { _tree :: RoseTree State
-    , _stateIdx :: [(State, TreePath)] }
+    , _stateIdx :: Seq.Seq (State, TreePath) }
 
 nearestNode :: RRT -> State -> (State, TreePath)
 nearestNode rrt sample = minimumBy (compare `on` ((stateDistanceSqrd sample) . fst))
@@ -71,7 +71,7 @@ extendRRT rrt sample valid maxStep =
         newState = extendTowardState near sample maxStep
     in  if valid sample newState
         then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-             in RRT newTree $ (newState,ps ++ [newIdx]):(_stateIdx rrt)
+             in RRT newTree $ (newState,ps ++ [newIdx]) Seq.<| (_stateIdx rrt)
         else rrt
 
 buildRRT :: MotionPlanningProblem -> Double -> Int -> IO (RRT)
@@ -81,7 +81,7 @@ buildRRT problem stepSize numIterations =
         start = _startState problem
     in do
       stateSamples <- sequence $ replicate numIterations sample
-      return $! foldr' extend (RRT (Node start Seq.empty) [(start, [])]) stateSamples
+      return $! foldr' extend (RRT (Node start Seq.empty) (Seq.singleton (start, []))) stateSamples
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
