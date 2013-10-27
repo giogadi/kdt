@@ -1,9 +1,10 @@
 import System.Random (randomRIO)
-import Data.Tree
-import Data.Tree.Zipper
 import System.IO
+-- import Data.Tree
+-- import Data.Tree.Zipper
+import qualified Data.Sequence as Seq
 import Data.List (intercalate)
-import Data.Foldable (minimumBy, foldr')
+import Data.Foldable (minimumBy, foldr', toList, sum)
 import Data.Function (on)
 
 data State = State { x :: Double
@@ -41,17 +42,23 @@ data MotionPlanningProblem = MotionPlanningProblem
     , _maxBound :: State
     , _motionValidity :: MotionValidityFn }
 
+data RoseTree a = Node a (Seq.Seq (RoseTree a))
+
+treeSize :: RoseTree a -> Int
+treeSize t = go t 0
+    where go (Node x ts) i = 1 + (Data.Foldable.sum $ fmap (flip go $ 0) ts)
+
+
 type TreePath = [Int]
 
-addChildAt :: Tree a -> TreePath -> a -> (Tree a, Int)
-addChildAt (Node l ts) [] s = ((Node l (ts ++ [(Node s [])])), length ts)
-addChildAt (Node l ts) (p:ps) s = let (newChild,idx) = addChildAt (ts !! p) ps s
-                                      newTree = Node l $ let (t1,(_:t2)) = splitAt p ts
-                                                         in  t1 ++ [newChild] ++ t2
+addChildAt :: RoseTree a -> TreePath -> a -> (RoseTree a, Int)
+addChildAt (Node l ts) [] s = ((Node l (ts Seq.|> (Node s Seq.empty))), Seq.length ts)
+addChildAt (Node l ts) (p:ps) s = let (newChild,idx) = addChildAt (ts `Seq.index` p) ps s
+                                      newTree = Node l $ Seq.update p newChild ts
                                   in  (newTree,idx)
 
 data RRT = RRT
-    { _tree :: Tree State
+    { _tree :: RoseTree State
     , _stateIdx :: [(State, TreePath)] }
 
 nearestNode :: RRT -> State -> (State, TreePath)
@@ -74,22 +81,22 @@ buildRRT problem stepSize numIterations =
         start = _startState problem
     in do
       stateSamples <- sequence $ replicate numIterations sample
-      return $! foldr' extend (RRT (Node start []) [(start, [])]) stateSamples
+      return $! foldr' extend (RRT (Node start Seq.empty) [(start, [])]) stateSamples
 
-edgesFromRRT :: Tree State -> [(State,State)]
-edgesFromRRT tree = let treePos = fromTree tree
-                    in  collectEdges treePos (nextTree $ children treePos) []
-    where collectEdges rootPos Nothing edges = edges
-          collectEdges rootPos (Just c) edges = 
-              let childEdges = collectEdges c (nextTree $ children c) []
-                  siblingEdges = collectEdges rootPos (next c) edges
-              in (label rootPos, label c) : childEdges ++ siblingEdges
+-- edgesFromRRT :: Tree State -> [(State,State)]
+-- edgesFromRRT tree = let treePos = fromTree tree
+--                     in  collectEdges treePos (nextTree $ children treePos) []
+--     where collectEdges rootPos Nothing edges = edges
+--           collectEdges rootPos (Just c) edges = 
+--               let childEdges = collectEdges c (nextTree $ children c) []
+--                   siblingEdges = collectEdges rootPos (next c) edges
+--               in (label rootPos, label c) : childEdges ++ siblingEdges
               
-writeRRT :: Tree State -> String -> IO ()
-writeRRT tree fileName = writeFile fileName $ intercalate "\n" edgeStrings
-    where edgeStrings = [stringFromEdge edge | edge <- edgesFromRRT tree]
-          stringFromEdge (s1,s2) = (stringFromState s1) ++ " " ++ (stringFromState s2)
-          stringFromState s = (show $ x s) ++ " " ++ (show $ y s)
+-- writeRRT :: RoseTree State -> String -> IO ()
+-- writeRRT tree fileName = writeFile fileName $ intercalate "\n" edgeStrings
+--     where edgeStrings = [stringFromEdge edge | edge <- edgesFromRRT tree]
+--           stringFromEdge (s1,s2) = (stringFromState s1) ++ " " ++ (stringFromState s2)
+--           stringFromState s = (show $ x s) ++ " " ++ (show $ y s)
 
 main = let p = MotionPlanningProblem
                { _startState = State 0.0 0.0
@@ -99,5 +106,6 @@ main = let p = MotionPlanningProblem
                , _motionValidity = \_ _ -> True }
        in do
          rrt <- buildRRT p 0.01 5000
-         writeRRT (_tree rrt) "/Users/luis/Desktop/rrt.txt"
+         print $ treeSize (_tree rrt)
+         -- writeRRT (_tree rrt) "/Users/luis/Desktop/rrt.txt"
          return ()
