@@ -4,7 +4,7 @@ import System.IO
 -- import Data.Tree.Zipper
 import qualified Data.Sequence as Seq
 import Data.List (intercalate)
-import Data.Foldable (minimumBy, foldr', toList, sum)
+import Data.Foldable (minimumBy, foldr', toList, sum, Foldable, foldl')
 import Data.Function (on)
 
 data State = State { x :: Double
@@ -61,17 +61,27 @@ data RRT = RRT
     { _tree :: RoseTree State
     , _stateIdx :: Seq.Seq (State, TreePath) }
 
+
+-- TODO make this have exact same signature as minimumBy
+minimumBy' :: Foldable t => (a -> a -> Ordering) -> t a -> a -> a
+minimumBy' cmp f start = foldl' min' start f
+    where min' x y = case cmp x y of
+                       GT -> x
+                       _  -> y
+
 nearestNode :: RRT -> State -> (State, TreePath)
-nearestNode rrt sample = minimumBy (compare `on` ((stateDistanceSqrd sample) . fst))
-                         (_stateIdx rrt)
+nearestNode rrt sample = minimumBy' (compare `on` ((stateDistanceSqrd sample) . fst))
+                         (_stateIdx rrt) (State 999999.0 999999.0, [])
 
 extendRRT :: RRT -> State -> MotionValidityFn -> Double -> RRT
 extendRRT rrt sample valid maxStep =
     let (near,ps) = nearestNode rrt sample
         newState = extendTowardState near sample maxStep
-    in  if valid sample newState
+    in  newState `seq`
+        if valid sample newState
         then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-             in RRT newTree $ (newState,ps ++ [newIdx]) Seq.<| (_stateIdx rrt)
+                 breadcrumbs = ps ++ [newIdx]
+             in breadcrumbs `seq` RRT newTree $ (newState,breadcrumbs) Seq.<| (_stateIdx rrt)
         else rrt
 
 buildRRT :: MotionPlanningProblem -> Double -> Int -> IO (RRT)
@@ -81,7 +91,7 @@ buildRRT problem stepSize numIterations =
         start = _startState problem
     in do
       stateSamples <- sequence $ replicate numIterations sample
-      return $! foldr' extend (RRT (Node start Seq.empty) (Seq.singleton (start, []))) stateSamples
+      return $ foldr' extend (RRT (Node start Seq.empty) (Seq.singleton (start, []))) stateSamples
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
