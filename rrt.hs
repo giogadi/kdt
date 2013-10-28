@@ -59,9 +59,10 @@ addChildAt (Node l ts) (p:ps) s = let (newChild,idx) = addChildAt (ts `Seq.index
 
 data RRT = RRT
     { _tree :: RoseTree State
-    , _stateIdx :: Seq.Seq (State, TreePath) }
+    , _stateIdx :: [(State, TreePath)] }
 
 
+-- A strict implementation of minimumBy
 -- TODO make this have exact same signature as minimumBy
 minimumBy' :: Foldable t => (a -> a -> Ordering) -> t a -> a -> a
 minimumBy' cmp f start = foldl' min' start f
@@ -80,8 +81,7 @@ extendRRT rrt sample valid maxStep =
     in  newState `seq`
         if valid sample newState
         then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-                 breadcrumbs = ps ++ [newIdx]
-             in breadcrumbs `seq` RRT newTree $ (newState,breadcrumbs) Seq.<| (_stateIdx rrt)
+             in RRT newTree $ (newState,ps ++ [newIdx]) : (_stateIdx rrt)
         else rrt
 
 buildRRT :: MotionPlanningProblem -> Double -> Int -> IO (RRT)
@@ -91,7 +91,7 @@ buildRRT problem stepSize numIterations =
         start = _startState problem
     in do
       stateSamples <- sequence $ replicate numIterations sample
-      return $ foldr' extend (RRT (Node start Seq.empty) (Seq.singleton (start, []))) stateSamples
+      return $ foldr' extend (RRT (Node start Seq.empty) [(start, [])]) stateSamples
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
