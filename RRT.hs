@@ -1,20 +1,26 @@
-import System.Random (randomRIO)
+module RRT
+    ( MotionPlanningProblem
+    , RRT
+    , buildRRT
+    ) where
+
+import System.Random (randomR, RandomGen, mkStdGen)
+import Control.Monad (liftM2)
+import qualified Control.Monad.Random as CMR
 import System.IO
--- import Data.Tree
--- import Data.Tree.Zipper
 import qualified Data.Sequence as Seq
-import Data.List (intercalate)
-import Data.Foldable (minimumBy, foldr', toList, sum, Foldable, foldl')
+import Data.List (intercalate, foldl1')
+import Data.Foldable (minimumBy, foldr', toList, sum)
 import Data.Function (on)
 
 data State = State { x :: Double
                    , y :: Double } deriving (Show,Eq)
 
-sampleUniformState :: State -> State -> IO State
-sampleUniformState minBound maxBound = do
-  sampleX <- randomRIO (x minBound, x maxBound)
-  sampleY <- randomRIO (y minBound, y maxBound)
-  return State {x = sampleX, y = sampleY}
+sampleUniformState :: RandomGen g => State -> State -> CMR.Rand g State
+sampleUniformState minBound maxBound =
+    (liftM2 State)
+           (CMR.getRandomR (x minBound, x maxBound))
+           (CMR.getRandomR (y minBound, y maxBound))
 
 stateDistanceSqrd :: State -> State -> Double
 stateDistanceSqrd s1 s2 = let dx = (x s2) - (x s1)
@@ -61,18 +67,16 @@ data RRT = RRT
     { _tree :: RoseTree State
     , _stateIdx :: [(State, TreePath)] }
 
-
 -- A strict implementation of minimumBy
--- TODO make this have exact same signature as minimumBy
-minimumBy' :: Foldable t => (a -> a -> Ordering) -> t a -> a -> a
-minimumBy' cmp f start = foldl' min' start f
+minimumBy' :: (a -> a -> Ordering) -> [a] -> a
+minimumBy' cmp = foldl1' min'
     where min' x y = case cmp x y of
                        GT -> x
                        _  -> y
 
 nearestNode :: RRT -> State -> (State, TreePath)
 nearestNode rrt sample = minimumBy' (compare `on` ((stateDistanceSqrd sample) . fst))
-                         (_stateIdx rrt) (State 999999.0 999999.0, [])
+                         (_stateIdx rrt)
 
 extendRRT :: RRT -> State -> MotionValidityFn -> Double -> RRT
 extendRRT rrt sample valid maxStep =
@@ -84,14 +88,19 @@ extendRRT rrt sample valid maxStep =
              in RRT newTree $ (newState,ps ++ [newIdx]) : (_stateIdx rrt)
         else rrt
 
-buildRRT :: MotionPlanningProblem -> Double -> Int -> IO (RRT)
+buildRRT :: RandomGen g => MotionPlanningProblem -> Double -> Int -> CMR.Rand g RRT
 buildRRT problem stepSize numIterations =
     let sample = sampleUniformState (_minBound problem) (_maxBound problem)
         extend state rrt = extendRRT rrt state (_motionValidity problem) stepSize
         start = _startState problem
+        beginRRT = RRT (Node start Seq.empty) [(start, [])]
     in do
       stateSamples <- sequence $ replicate numIterations sample
-      return $ foldr' extend (RRT (Node start Seq.empty) [(start, [])]) stateSamples
+      return $ foldr' extend beginRRT stateSamples
+
+buildRRTDefaultSeed :: MotionPlanningProblem -> Double -> Int -> RRT
+buildRRTDefaultSeed problem stepSize numIterations =
+    CMR.evalRand (buildRRT problem stepSize numIterations) (mkStdGen 1)
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
@@ -108,14 +117,14 @@ buildRRT problem stepSize numIterations =
 --           stringFromEdge (s1,s2) = (stringFromState s1) ++ " " ++ (stringFromState s2)
 --           stringFromState s = (show $ x s) ++ " " ++ (show $ y s)
 
-main = let p = MotionPlanningProblem
-               { _startState = State 0.0 0.0
-               , _goalState = State 1.0 1.0
-               , _minBound = State 0.0 0.0
-               , _maxBound = State 1.0 1.0
-               , _motionValidity = \_ _ -> True }
-       in do
-         rrt <- buildRRT p 0.01 5000
-         print $ treeSize (_tree rrt)
-         -- writeRRT (_tree rrt) "/Users/luis/Desktop/rrt.txt"
-         return ()
+-- main = let p = MotionPlanningProblem
+--                { _startState = State 0.0 0.0
+--                , _goalState = State 1.0 1.0
+--                , _minBound = State 0.0 0.0
+--                , _maxBound = State 1.0 1.0
+--                , _motionValidity = \_ _ -> True }
+--        in do
+--          let rrt = buildRRTDefaultSeed p 0.01 5000
+--          print $ treeSize (_tree rrt)
+--          -- writeRRT (_tree rrt) "/Users/luis/Desktop/rrt.txt"
+--          return ()
