@@ -19,6 +19,12 @@ library
   exposed-modules:     RRT
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.5 && <4.6, random >=1.0 && <1.1, containers >=0.4 && <0.5, MonadRandom ==0.1.12
+  build-depends:       base >=4.5 && <4.6, random >=1.0 && <1.1, containers >=0.4 && <0.5, MonadRandom ==0.1.12, QuickCheck ==2.6
   -- hs-source-dirs:      
   default-language:    Haskell2010
+
+Test-Suite RRTTest
+  type: exitcode-stdio-1.0
+  main-is: tests/RRTTest.hs
+  other-modules: RRT
+  build-depends: base >=4.5 && <4.6, test-framework ==0.8.0.3, test-framework-quickcheck2 ==0.3.0.2, QuickCheck ==2.6, containers >=0.4 && <0.5, MonadRandom ==0.1.12, random >=1.0 && <1.1

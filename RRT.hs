@@ -2,6 +2,9 @@ module RRT
     ( MotionPlanningProblem
     , RRT
     , buildRRT
+    , prop_nonnegDist  -- test
+    , prop_squaredDist -- test
+    , prop_extendLimit -- test
     ) where
 
 import System.Random (randomR, RandomGen, mkStdGen)
@@ -12,9 +15,15 @@ import qualified Data.Sequence as Seq
 import Data.List (intercalate, foldl1')
 import Data.Foldable (minimumBy, foldr', toList, sum)
 import Data.Function (on)
+import qualified Test.QuickCheck as QC
+import Control.Applicative
 
 data State = State { x :: Double
                    , y :: Double } deriving (Show,Eq)
+
+instance QC.Arbitrary State where
+    arbitrary = State <$> QC.arbitrary <*> QC.arbitrary
+
 
 sampleUniformState :: RandomGen g => State -> State -> CMR.Rand g State
 sampleUniformState minBound maxBound =
@@ -101,6 +110,19 @@ buildRRT problem stepSize numIterations =
 buildRRTDefaultSeed :: MotionPlanningProblem -> Double -> Int -> RRT
 buildRRTDefaultSeed problem stepSize numIterations =
     CMR.evalRand (buildRRT problem stepSize numIterations) (mkStdGen 1)
+
+--------------------------------------------------
+-- Tests
+--------------------------------------------------
+prop_nonnegDist :: State -> State -> Bool
+prop_nonnegDist s1 s2 = stateDistance s1 s2 >= 0.0
+
+prop_squaredDist :: State -> State -> Bool
+prop_squaredDist s1 s2 = abs ((stateDistance s1 s2)^2 - (stateDistanceSqrd s1 s2)) < 1e-7
+
+prop_extendLimit :: State -> State -> QC.Positive Double -> Bool
+prop_extendLimit s1 s2 (QC.Positive d) = let newState = extendTowardState s1 s2 d
+                                         in  stateDistance s1 newState <= d + 1e-7
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
