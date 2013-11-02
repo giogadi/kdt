@@ -4,8 +4,8 @@ module Data.StateSpace
 import qualified Control.Monad.Random as CMR
 
 data StateSpace s g = StateSpace
-    { stateDistance :: s -> s -> Double
-    , fastNonMetricDistance :: s -> s -> Double
-    , interpolate :: s -> s -> Double -> s
-    , sampleUniform :: CMR.Rand g s
+    { _stateDistance :: s -> s -> Double
+    , _fastNonMetricDistance :: s -> s -> Double
+    , _interpolate :: s -> s -> Double -> s
+    , _sampleUniform :: CMR.Rand g s
     }
