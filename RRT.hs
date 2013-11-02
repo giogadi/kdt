@@ -2,9 +2,7 @@ module RRT
     ( MotionPlanningProblem
     , RRT
     , buildRRT
-    , prop_nonnegDist  -- test
-    , prop_squaredDist -- test
-    , prop_extendLimit -- test
+    , rrtTests
     ) where
 
 import System.Random (randomR, RandomGen, mkStdGen)
@@ -17,6 +15,8 @@ import Data.Foldable (minimumBy, foldr', toList, sum)
 import Data.Function (on)
 import qualified Test.QuickCheck as QC
 import Control.Applicative
+import Test.Framework (testGroup)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 data State = State { x :: Double
                    , y :: Double } deriving (Show,Eq)
@@ -118,11 +118,16 @@ prop_nonnegDist :: State -> State -> Bool
 prop_nonnegDist s1 s2 = stateDistance s1 s2 >= 0.0
 
 prop_squaredDist :: State -> State -> Bool
-prop_squaredDist s1 s2 = abs ((stateDistance s1 s2)^2 - (stateDistanceSqrd s1 s2)) < 1e-7
+prop_squaredDist s1 s2 = abs ((stateDistance s1 s2)^2 - (stateDistanceSqrd s1 s2)) < 1e-5
 
 prop_extendLimit :: State -> State -> QC.Positive Double -> Bool
 prop_extendLimit s1 s2 (QC.Positive d) = let newState = extendTowardState s1 s2 d
                                          in  stateDistance s1 newState <= d + 1e-7
+
+rrtTests = testGroup "RRT tests" [
+            testProperty "Nonnegative distance" prop_nonnegDist,
+            testProperty "Squared distance" prop_squaredDist,
+            testProperty "Extend limit" prop_extendLimit]
 
 -- edgesFromRRT :: Tree State -> [(State,State)]
 -- edgesFromRRT tree = let treePos = fromTree tree
