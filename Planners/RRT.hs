@@ -69,8 +69,8 @@ minimumBy' cmp = foldl1' min'
                        _  -> y
 
 nearestNode :: RRT s g -> s -> (s, TreePath)
-nearestNode rrt sample = let compareFn = (getNonMetricDist rrt $ sample) . fst
-                         in  minimumBy' (compare `on` compareFn) (_stateIdx rrt)
+nearestNode rrt sample = let compareFn = compare `on` ((getNonMetricDist rrt $ sample) . fst)
+                         in  minimumBy' compareFn (_stateIdx rrt)
 
 extendRRT :: s -> RRT s g -> RRT s g
 extendRRT sample rrt =
