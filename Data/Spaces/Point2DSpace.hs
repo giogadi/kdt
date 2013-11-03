@@ -30,6 +30,7 @@ getUniformSampler (Point2D xmin ymin) (Point2D xmax ymax) =
     (CMR.getRandomR (xmin, xmax))
     (CMR.getRandomR (ymin, ymax))
 
+makePoint2DSpace :: CMR.RandomGen g => Point2D -> Point2D -> SS.StateSpace Point2D g
 makePoint2DSpace pmin pmax = SS.StateSpace
                              stateDistance
                              stateDistanceSqrd

@@ -41,13 +41,13 @@ interpolate s1 s2 d = let vn = normalizeV $ s2 `minusV` s1
 
 getUniformSampler :: (FL.FixedList f, CMR.RandomGen g) => 
                      f Double -> f Double -> CMR.Rand g (f Double)
-getUniformSampler minBound maxBound = let bounds = pure (,) <*> minBound <*> maxBound
+getUniformSampler minState maxState = let bounds = pure (,) <*> minState <*> maxState
                                       in  sequenceA $ fmap CMR.getRandomR bounds
 
 makeRealVectorStateSpace :: (FL.FixedList f, CMR.RandomGen g) =>
                             f Double -> f Double -> SS.StateSpace (f Double) g
-makeRealVectorStateSpace minBound maxBound = SS.StateSpace
+makeRealVectorStateSpace minState maxState = SS.StateSpace
                                              stateDistance
                                              stateDistanceSqrd
                                              interpolate
-                                             (getUniformSampler minBound maxBound)
+                                             (getUniformSampler minState maxState)

@@ -9,25 +9,20 @@ module Planners.RRT
 import Data.StateSpace
 import Data.MotionPlanningProblem
 
-import System.Random (randomR, RandomGen, mkStdGen, StdGen)
-import Control.Monad (liftM2)
+import System.Random (RandomGen, mkStdGen, StdGen)
 import qualified Control.Monad.Random as CMR
-import System.IO
 import qualified Data.Sequence as Seq
-import Data.List (intercalate, foldl1')
-import Data.Foldable (minimumBy, foldr', toList, sum)
+import Data.List (foldl1')
+import Data.Foldable (foldr', sum)
 import Data.Function (on)
-import qualified Test.QuickCheck as QC
-import Control.Applicative
-import Test.Framework (testGroup)
-import Test.Framework.Providers.QuickCheck2 (testProperty)
+-- import qualified Test.QuickCheck as QC
+-- import Test.Framework (testGroup)
+-- import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 data RoseTree a = Node a (Seq.Seq (RoseTree a))
 
 treeSize :: RoseTree a -> Int
-treeSize t = go t 0
-    where go (Node x ts) i = 1 + (Data.Foldable.sum $ fmap (flip go $ 0) ts)
-
+treeSize (Node _ ts) = 1 + (Data.Foldable.sum $ fmap treeSize ts)
 
 type TreePath = [Int]
 
@@ -45,9 +40,6 @@ data RRT s g = RRT
 
 getSpace :: RRT s g -> StateSpace s g
 getSpace = _stateSpace . _problem
-
-getDist :: RRT s g -> (s -> s -> Double)
-getDist rrt = _stateDistance $ getSpace rrt
 
 getNonMetricDist :: RRT s g -> (s -> s -> Double)
 getNonMetricDist rrt = _fastNonMetricDistance $ getSpace rrt
@@ -131,15 +123,3 @@ buildRRTDefaultSeed problem stepSize numIterations =
 --     where edgeStrings = [stringFromEdge edge | edge <- edgesFromRRT tree]
 --           stringFromEdge (s1,s2) = (stringFromState s1) ++ " " ++ (stringFromState s2)
 --           stringFromState s = (show $ x s) ++ " " ++ (show $ y s)
-
--- main = let p = MotionPlanningProblem
---                { _startState = State 0.0 0.0
---                , _goalState = State 1.0 1.0
---                , _minBound = State 0.0 0.0
---                , _maxBound = State 1.0 1.0
---                , _motionValidity = \_ _ -> True }
---        in do
---          let rrt = buildRRTDefaultSeed p 0.01 5000
---          print $ treeSize (_tree rrt)
---          -- writeRRT (_tree rrt) "/Users/luis/Desktop/rrt.txt"
---          return ()
