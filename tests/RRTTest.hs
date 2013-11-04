@@ -2,7 +2,7 @@ import Data.StateSpace
 -- import Data.Spaces.RealVectorStateSpace (makeRealVectorStateSpace)
 import Data.Spaces.Point2DSpace
 import Data.MotionPlanningProblem (MotionPlanningProblem(..))
-import Planners.RRT (buildRRTDefaultSeed, getNumStates)
+import Planners.RRT (buildRRTDefaultSeed, getNumStates, writeRRT)
 
 -- import Data.FixedList
 
@@ -26,4 +26,6 @@ main = let minState = Point2D 0.0 0.0
                , _goalState = maxState
                , _motionValidity = \_ _ -> True }
            rrt = buildRRTDefaultSeed p 0.01 5000
-       in  print $ getNumStates rrt
+       in  do
+             print $ getNumStates rrt
+             writeRRT rrt "rrt-test.txt"

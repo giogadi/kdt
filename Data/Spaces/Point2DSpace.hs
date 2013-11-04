@@ -8,6 +8,9 @@ import qualified Data.StateSpace as SS
 
 data Point2D = Point2D !Double !Double
 
+instance Show Point2D where
+    show (Point2D x y) = show x ++ " " ++ show y
+
 stateDistanceSqrd :: Point2D -> Point2D -> Double
 stateDistanceSqrd (Point2D x1 y1) (Point2D x2 y2) = 
     let v1 = x2 - x1
@@ -21,8 +24,7 @@ interpolate :: Point2D -> Point2D -> Double -> Point2D
 interpolate (Point2D x1 y1) (Point2D x2 y2) d =
     let v1 = x2 - x1
         v2 = y2 - y1
-        s = d / (sqrt $ v1*v1 + v2*v2)
-    in  Point2D (x1 + s*v1) (y1 + s*v2)
+    in  Point2D (x1 + d*v1) (y1 + d*v2)
 
 getUniformSampler :: (CMR.RandomGen g) => Point2D -> Point2D -> CMR.Rand g (Point2D)
 getUniformSampler (Point2D xmin ymin) (Point2D xmax ymax) =

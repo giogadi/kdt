@@ -3,17 +3,20 @@ module Planners.RRT
     , buildRRT
     , buildRRTDefaultSeed
     , getNumStates
+    , writeRRT
     -- , rrtTests
     ) where
 
 import Data.StateSpace
 import Data.MotionPlanningProblem
 
+import Debug.Trace (trace)
+import Data.Maybe (isJust, fromJust)
 import System.Random (RandomGen, mkStdGen, StdGen)
 import qualified Control.Monad.Random as CMR
 import qualified Data.Sequence as Seq
-import Data.List (foldl1')
-import Data.Foldable (foldr', sum)
+import Data.List (foldl1', intercalate)
+import Data.Foldable (foldr', sum, toList)
 import Data.Function (on)
 -- import qualified Test.QuickCheck as QC
 -- import Test.Framework (testGroup)
@@ -21,8 +24,16 @@ import Data.Function (on)
 
 data RoseTree a = Node a (Seq.Seq (RoseTree a))
 
+rootLabel :: RoseTree a -> a
+rootLabel (Node s _) = s
+
 treeSize :: RoseTree a -> Int
 treeSize (Node _ ts) = 1 + (Data.Foldable.sum $ fmap treeSize ts)
+
+treeEdges :: RoseTree a -> [(a,a)]
+treeEdges t = go t
+    where go (Node s ts) = let listT = toList ts
+                           in  (zip (repeat s) $ rootLabel `fmap` listT) ++ (concat (go `fmap` listT))
 
 type TreePath = [Int]
 
@@ -44,6 +55,9 @@ getSpace = _stateSpace . _problem
 getNonMetricDist :: RRT s g -> (s -> s -> Double)
 getNonMetricDist rrt = _fastNonMetricDistance $ getSpace rrt
 
+getDist :: RRT s g -> (s -> s -> Double)
+getDist rrt = _stateDistance $ getSpace rrt
+
 getValidityFn :: RRT s g -> MotionValidityFn s
 getValidityFn rrt = _motionValidity $ _problem rrt
 
@@ -53,39 +67,54 @@ getInterp rrt = _interpolate $ getSpace rrt
 getNumStates :: RRT s g -> Int
 getNumStates = treeSize . _tree
 
+writeRRT :: Show s => RRT s g -> String -> IO ()
+writeRRT rrt fileName = writeFile fileName $ intercalate "\n" edgeStrings
+    where edgeStrings = map stringFromEdge $ treeEdges (_tree rrt)
+          stringFromEdge (s1,s2) = (show s1) ++ " " ++ (show s2)
+
 -- A strict implementation of minimumBy
 minimumBy' :: (a -> a -> Ordering) -> [a] -> a
 minimumBy' cmp = foldl1' min'
     where min' x y = case cmp x y of
-                       GT -> x
-                       _  -> y
+                       GT -> y
+                       _  -> x
 
 nearestNode :: RRT s g -> s -> (s, TreePath)
 nearestNode rrt sample = let compareFn = compare `on` ((getNonMetricDist rrt $ sample) . fst)
                          in  minimumBy' compareFn (_stateIdx rrt)
 
-extendRRT :: s -> RRT s g -> RRT s g
-extendRRT sample rrt =
+extendRRT :: RRT s g -> s -> (RRT s g, Maybe s)
+extendRRT rrt sample =
     let (near,ps) = nearestNode rrt sample
-        newState = (getInterp rrt) near sample $ _stepSize rrt
+        newState = let d = (getDist rrt) near sample
+                   in  if d <= (_stepSize rrt)
+                       then (getInterp rrt) near sample 1.0
+                       else (getInterp rrt) near sample $ (_stepSize rrt) / d
     in  newState `seq`
         if (getValidityFn rrt) sample newState
-        then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-             in RRT 
-                    (_problem rrt) 
-                    (_stepSize rrt) 
-                    newTree $ 
-                    (newState,ps ++ [newIdx]) : (_stateIdx rrt)
-        else rrt
+          then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
+                   newRRT = RRT
+                            (_problem rrt)
+                            (_stepSize rrt)
+                            newTree $ (newState,ps ++ [newIdx]) : (_stateIdx rrt)
+               in  (newRRT, Just newState)
+          else (rrt, Nothing)
 
 buildRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g (RRT s g)
 buildRRT problem stepSize numIterations =
-    let sample = _sampleUniform $ _stateSpace problem
-        start = _startState problem
+    let start = _startState problem
         beginRRT = RRT problem stepSize (Node start Seq.empty) [(start, [])]
-    in do
-      stateSamples <- sequence $ replicate numIterations sample
-      return $ foldr' extendRRT beginRRT stateSamples
+    in  go beginRRT Nothing 0
+    where -- go :: RandomGen g => (RRT s g) -> Maybe s -> Int -> CMR.Rand g (RRT s g)
+          go rrt lastState iteration
+              | iteration >= numIterations = return rrt
+              | (isJust lastState) && inGoal (fromJust lastState) = return rrt
+              | otherwise = do
+                              (newRRT, newState) <- (extendRRT rrt) `fmap` sample
+                              go newRRT newState (iteration + 1)
+              where inGoal state = ((getNonMetricDist rrt) state goal) <= 0.01
+                    goal = _goalState problem
+                    sample = _sampleUniform $ _stateSpace problem
 
 buildRRTDefaultSeed :: MotionPlanningProblem s StdGen -> Double -> Int -> RRT s StdGen
 buildRRTDefaultSeed problem stepSize numIterations =
@@ -108,18 +137,3 @@ buildRRTDefaultSeed problem stepSize numIterations =
 --             testProperty "Nonnegative distance" prop_nonnegDist,
 --             testProperty "Squared distance" prop_squaredDist,
 --             testProperty "Extend limit" prop_extendLimit]
-
--- edgesFromRRT :: Tree State -> [(State,State)]
--- edgesFromRRT tree = let treePos = fromTree tree
---                     in  collectEdges treePos (nextTree $ children treePos) []
---     where collectEdges rootPos Nothing edges = edges
---           collectEdges rootPos (Just c) edges = 
---               let childEdges = collectEdges c (nextTree $ children c) []
---                   siblingEdges = collectEdges rootPos (next c) edges
---               in (label rootPos, label c) : childEdges ++ siblingEdges
-              
--- writeRRT :: RoseTree State -> String -> IO ()
--- writeRRT tree fileName = writeFile fileName $ intercalate "\n" edgeStrings
---     where edgeStrings = [stringFromEdge edge | edge <- edgesFromRRT tree]
---           stringFromEdge (s1,s2) = (stringFromState s1) ++ " " ++ (stringFromState s2)
---           stringFromState s = (show $ x s) ++ " " ++ (show $ y s)
