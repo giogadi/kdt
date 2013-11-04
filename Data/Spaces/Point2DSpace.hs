@@ -6,7 +6,7 @@ import qualified Control.Monad.Random as CMR
 import Control.Monad (liftM2)
 import qualified Data.StateSpace as SS
 
-data Point2D = Point2D Double Double
+data Point2D = Point2D !Double !Double
 
 stateDistanceSqrd :: Point2D -> Point2D -> Double
 stateDistanceSqrd (Point2D x1 y1) (Point2D x2 y2) = 
