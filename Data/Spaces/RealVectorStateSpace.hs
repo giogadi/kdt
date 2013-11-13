@@ -1,4 +1,4 @@
-module Data.Spaces.RealVectorStateSpace 
+module Data.Spaces.RealVectorStateSpace
     ( makeRealVectorStateSpace )
 
 where
@@ -30,16 +30,17 @@ normalizeV v = let scale = 1.0 / (lengthV v)
                in  scaleV v scale
 
 stateDistance :: (FL.FixedList f) => f Double -> f Double -> Double
-stateDistance s1 s2 = lengthV $ s2 `minusV` s1
+stateDistance s1 s2 = lengthV $ s2 `minus` s1
 
 stateDistanceSqrd :: (FL.FixedList f) => f Double -> f Double -> Double
-stateDistanceSqrd = dotV
+stateDistanceSqrd s1 s2 = let dv = s2 `minusV` s1
+                          in  dv `dotV` dv
 
 interpolate :: (FL.FixedList f) => f Double -> f Double -> Double -> f Double
-interpolate s1 s2 d = let vn = normalizeV $ s2 `minusV` s1
-                      in  s1 `addV` (scaleV vn d)
+interpolate s1 s2 d = let v = s2 `minusV` s1
+                      in  s1 `addV` (scaleV v d)
 
-getUniformSampler :: (FL.FixedList f, CMR.RandomGen g) => 
+getUniformSampler :: (FL.FixedList f, CMR.RandomGen g) =>
                      f Double -> f Double -> CMR.Rand g (f Double)
 getUniformSampler minState maxState = let bounds = pure (,) <*> minState <*> maxState
                                       in  sequenceA $ fmap CMR.getRandomR bounds

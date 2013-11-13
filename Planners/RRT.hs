@@ -1,7 +1,8 @@
 module Planners.RRT
     ( RRT
+    , solveRRT
+    , solveRRTDefaultSeed
     , buildRRT
-    , buildRRTDefaultSeed
     , getNumStates
     , writeRRT
     -- , rrtTests
@@ -37,6 +38,14 @@ treeEdges t = go t
 
 type TreePath = [Int]
 
+getNodeAt :: RoseTree a -> TreePath -> a
+getNodeAt (Node l ts) [] = l
+getNodeAt (Node l ts) (p:ps) = getNodeAt (ts `Seq.index` p) ps
+
+getPathNodes :: RoseTree a -> TreePath -> [a]
+getPathNodes (Node l ts) [] = [l]
+getPathNodes (Node l ts) (p:ps) = l : (getPathNodes (ts `Seq.index` p) ps)
+
 addChildAt :: RoseTree a -> TreePath -> a -> (RoseTree a, Int)
 addChildAt (Node l ts) [] s = ((Node l (ts Seq.|> (Node s Seq.empty))), Seq.length ts)
 addChildAt (Node l ts) (p:ps) s = let (newChild,idx) = addChildAt (ts `Seq.index` p) ps s
@@ -47,7 +56,8 @@ data RRT s g = RRT
     { _problem  :: MotionPlanningProblem s g
     , _stepSize :: Double
     , _tree     :: RoseTree s
-    , _stateIdx :: [(s, TreePath)] }
+    , _stateIdx :: [(s, TreePath)]
+    , _closestToGoal :: Maybe (s, Double, TreePath)}
 
 getSpace :: RRT s g -> StateSpace s g
 getSpace = _stateSpace . _problem
@@ -83,7 +93,7 @@ nearestNode :: RRT s g -> s -> (s, TreePath)
 nearestNode rrt sample = let compareFn = compare `on` ((getNonMetricDist rrt $ sample) . fst)
                          in  minimumBy' compareFn (_stateIdx rrt)
 
-extendRRT :: RRT s g -> s -> (RRT s g, Maybe s)
+extendRRT :: RRT s g -> s -> RRT s g
 extendRRT rrt sample =
     let (near,ps) = nearestNode rrt sample
         newState = let d = (getDist rrt) near sample
@@ -92,33 +102,52 @@ extendRRT rrt sample =
                        else (getInterp rrt) near sample $ (_stepSize rrt) / d
     in  newState `seq`
         if (getValidityFn rrt) sample newState
-          then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-                   newRRT = RRT
-                            (_problem rrt)
-                            (_stepSize rrt)
-                            newTree $ (newState,ps ++ [newIdx]) : (_stateIdx rrt)
-               in  (newRRT, Just newState)
-          else (rrt, Nothing)
+        then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
+                 newGoalDist = (getNonMetricDist rrt) newState (_goalState $ _problem $ rrt)
+                 newPath = ps ++ [newIdx]
+                 newRRT = RRT
+                          (_problem rrt)
+                          (_stepSize rrt)
+                          newTree
+                          ((newState,newPath) : (_stateIdx rrt))
+                          (getNearGoal (_closestToGoal rrt) (Just (newState, newGoalDist, newPath)))
+             in  newRRT
+        else rrt
+  where getNearGoal Nothing Nothing = Nothing
+        getNearGoal a Nothing = a
+        getNearGoal Nothing a = a
+        getNearGoal (Just (s1, d1, p1)) (Just (s2, d2, p2))
+          | d2 < d1 = Just (s2, d2, p2)
+          | otherwise = Just (s1, d1, p1)
 
 buildRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g (RRT s g)
 buildRRT problem stepSize numIterations =
     let start = _startState problem
-        beginRRT = RRT problem stepSize (Node start Seq.empty) [(start, [])]
-    in  go beginRRT Nothing 0
-    where -- go :: RandomGen g => (RRT s g) -> Maybe s -> Int -> CMR.Rand g (RRT s g)
-          go rrt lastState iteration
-              | iteration >= numIterations = return rrt
-              | (isJust lastState) && inGoal (fromJust lastState) = return rrt
-              | otherwise = do
-                              (newRRT, newState) <- (extendRRT rrt) `fmap` sample
-                              go newRRT newState (iteration + 1)
-              where inGoal state = ((getNonMetricDist rrt) state goal) <= 0.01
-                    goal = _goalState problem
-                    sample = _sampleUniform $ _stateSpace problem
+        beginRRT = RRT problem stepSize (Node start Seq.empty) [(start, [])] Nothing
+    in  go beginRRT 0
+    where
+      go rrt iteration
+        | iteration >= numIterations = return rrt
+        | reachedGoal $ _closestToGoal rrt = return rrt
+        | otherwise = do
+          newRRT <- (extendRRT rrt) `fmap` sample
+          go newRRT (iteration + 1)
+        where reachedGoal Nothing = False
+              reachedGoal (Just (_,d,_)) = d <= 0.01*0.01
+              sample = _sampleUniform $ _stateSpace problem
 
-buildRRTDefaultSeed :: MotionPlanningProblem s StdGen -> Double -> Int -> RRT s StdGen
-buildRRTDefaultSeed problem stepSize numIterations =
-    CMR.evalRand (buildRRT problem stepSize numIterations) (mkStdGen 1)
+solveRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g [s]
+solveRRT problem stepSize numIterations = do
+  rrt <- buildRRT problem stepSize numIterations
+  let pathNodes =
+        case _closestToGoal rrt of
+          Nothing    -> []
+          Just (_,_,path) -> getPathNodes (_tree rrt) path
+  return pathNodes
+
+solveRRTDefaultSeed :: MotionPlanningProblem s StdGen -> Double -> Int -> [s]
+solveRRTDefaultSeed problem stepSize numIterations =
+    CMR.evalRand (solveRRT problem stepSize numIterations) (mkStdGen 1)
 
 -- --------------------------------------------------
 -- -- Tests
