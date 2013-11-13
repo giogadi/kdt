@@ -1,6 +1,6 @@
 module Data.MotionPlanningProblem
-    ( MotionValidityFn
-    , MotionPlanningProblem(..) ) where
+       ( MotionValidityFn
+       , MotionPlanningProblem(..) ) where
 
 import Data.StateSpace
 

@@ -1,7 +1,5 @@
 module Data.Spaces.RealVectorStateSpace
-    ( makeRealVectorStateSpace )
-
-where
+       ( makeRealVectorStateSpace ) where
 
 import qualified Data.FixedList as FL
 import Control.Applicative
@@ -37,8 +35,10 @@ stateDistanceSqrd s1 s2 = let dv = s2 `minusV` s1
                           in  dv `dotV` dv
 
 interpolate :: (FL.FixedList f) => f Double -> f Double -> Double -> f Double
-interpolate s1 s2 d = let v = s2 `minusV` s1
-                      in  s1 `addV` (scaleV v d)
+interpolate s1 s2 d
+  | d < 0.0 || d > 1.0 = error "Data.Point2DSpace.interpolate's parameter must be in [0,1]"
+  | otherwise = let v = s2 `minusV` s1
+                in  s1 `addV` (scaleV v d)
 
 getUniformSampler :: (FL.FixedList f, CMR.RandomGen g) =>
                      f Double -> f Double -> CMR.Rand g (f Double)

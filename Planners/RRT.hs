@@ -1,14 +1,14 @@
 module Planners.RRT
-    ( RRT
-    , solveRRT
-    , solveRRTDefaultSeed
-    , buildRRT
-    , buildRRTDefaultSeed
-    , getPathToGoal
-    , getNumStates
-    , writeRRT
-    -- , rrtTests
-    ) where
+       ( RRT
+       , solveRRT
+       , solveRRTDefaultSeed
+       , buildRRT
+       , buildRRTDefaultSeed
+       , getPathToGoal
+       , getNumStates
+       , writeRRT
+         -- , rrtTests
+       ) where
 
 import Data.StateSpace
 import Data.MotionPlanningProblem

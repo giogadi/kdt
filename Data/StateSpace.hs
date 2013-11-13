@@ -1,5 +1,5 @@
 module Data.StateSpace
-    ( StateSpace(..) ) where
+       ( StateSpace(..) ) where
 
 import qualified Control.Monad.Random as CMR
 
