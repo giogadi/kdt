@@ -1,7 +1,7 @@
 import Data.StateSpace
 import Data.Spaces.Point2DSpace
 import Data.MotionPlanningProblem
-import Planners.RRT (solveRRTDefaultSeed, buildRRTDefaultSeed, getNumStates, writeRRT)
+import Planners.RRT
 
 data Circle2D = Circle2D
   { _center :: Point2D
@@ -19,10 +19,12 @@ main = let minState = Point2D 0.0 0.0
            p = MotionPlanningProblem
                { _stateSpace = ss
                , _startState = minState
-               , _goalSatisfied = goalStateSatisfied ss 0.01 maxState
+               , _goalSatisfied = goalStateSatisfied ss 0.1 maxState
                , _motionValidity = discreteMotionValid ss (pointOutsideCircle circleObs) 0.002 }
-           -- motionPlan = solveRRTDefaultSeed p 0.01 5000
            rrt = buildRRTDefaultSeed p 0.01 5000
-           -- planLength = length motionPlan
-       in  --putStrLn $ "Computed a motion plan with " ++ (show planLength) ++ " states."
-        writeRRT rrt "rrt-test.txt"
+           motionPlan = getPathToGoal rrt
+       in do
+         putStrLn $ "Computed a motion plan with " ++ (show $ Prelude.length motionPlan) ++ " states."
+         putStrLn $ "Num states in tree: " ++ (show $ getNumStates rrt)
+         putStrLn $ "Plan:"
+         mapM_ (putStrLn . show) motionPlan

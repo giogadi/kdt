@@ -102,11 +102,10 @@ extendRRT rrt sample =
                    in  if d <= _stepSize rrt
                        then (getInterp rrt) near sample 1.0
                        else (getInterp rrt) near sample $ ((_stepSize rrt) / d)
-    in  newState `seq`
-        if (getValidityFn rrt) near newState
+    in  if (getValidityFn rrt) near newState
         then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
                  newPath = ps ++ [newIdx]
-                 solution = if   (_goalSatisfied $ _problem rrt) newState
+                 solution = if (_goalSatisfied $ _problem rrt) newState
                             then Just newPath
                             else Nothing
                  newRRT = RRT
@@ -114,7 +113,7 @@ extendRRT rrt sample =
                           (_stepSize rrt)
                           newTree
                           ((newState,newPath) : (_stateIdx rrt))
-                          Nothing
+                          solution
              in  newRRT
         else rrt
 

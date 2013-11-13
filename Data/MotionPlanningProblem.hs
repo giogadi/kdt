@@ -25,5 +25,4 @@ discreteMotionValid ss f h s1 s2
                 in  innerValid && (f s2)
 
 goalStateSatisfied :: StateSpace s g -> Double -> s -> (s -> Bool)
-goalStateSatisfied ss tol goalState s =
-  (_fastNonMetricDistance ss) s goalState <= tol*tol
+goalStateSatisfied ss tol goalState s = (_fastNonMetricDistance ss) s goalState <= tol*tol
