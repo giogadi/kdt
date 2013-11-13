@@ -25,4 +25,4 @@ main = let minState = Point2D 0.0 0.0
            rrt = buildRRTDefaultSeed p 0.01 5000
            -- planLength = length motionPlan
        in  --putStrLn $ "Computed a motion plan with " ++ (show planLength) ++ " states."
-        writeRRT rrt "/Users/luis/Desktop/rrt-test.txt"
+        writeRRT rrt "rrt-test.txt"
