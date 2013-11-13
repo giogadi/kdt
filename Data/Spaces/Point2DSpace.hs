@@ -1,6 +1,9 @@
 module Data.Spaces.Point2DSpace
     ( Point2D(..)
-    , makePoint2DSpace ) where
+    , makePoint2DSpace
+    , stateDistance
+    , stateDistanceSqrd
+    , interpolate ) where
 
 import qualified Control.Monad.Random as CMR
 import Control.Monad (liftM2)

@@ -3,6 +3,8 @@ module Planners.RRT
     , solveRRT
     , solveRRTDefaultSeed
     , buildRRT
+    , buildRRTDefaultSeed
+    , getPathToGoal
     , getNumStates
     , writeRRT
     -- , rrtTests
@@ -136,18 +138,23 @@ buildRRT problem stepSize numIterations =
               reachedGoal (Just (_,d,_)) = d <= 0.01*0.01
               sample = _sampleUniform $ _stateSpace problem
 
+getPathToGoal :: RandomGen g => RRT s g -> [s]
+getPathToGoal rrt =
+  case _closestToGoal rrt of
+    Nothing -> []
+    Just (_,_,path) -> getPathNodes (_tree rrt) path
+
 solveRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g [s]
-solveRRT problem stepSize numIterations = do
-  rrt <- buildRRT problem stepSize numIterations
-  let pathNodes =
-        case _closestToGoal rrt of
-          Nothing    -> []
-          Just (_,_,path) -> getPathNodes (_tree rrt) path
-  return pathNodes
+solveRRT problem stepSize numIterations =
+  fmap getPathToGoal $ buildRRT problem stepSize numIterations
+
+buildRRTDefaultSeed :: MotionPlanningProblem s StdGen -> Double -> Int -> RRT s StdGen
+buildRRTDefaultSeed problem stepSize numIterations =
+  CMR.evalRand (buildRRT problem stepSize numIterations) (mkStdGen 1)
 
 solveRRTDefaultSeed :: MotionPlanningProblem s StdGen -> Double -> Int -> [s]
 solveRRTDefaultSeed problem stepSize numIterations =
-    CMR.evalRand (solveRRT problem stepSize numIterations) (mkStdGen 1)
+  CMR.evalRand (solveRRT problem stepSize numIterations) (mkStdGen 1)
 
 -- --------------------------------------------------
 -- -- Tests

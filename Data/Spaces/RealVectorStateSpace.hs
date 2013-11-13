@@ -30,7 +30,7 @@ normalizeV v = let scale = 1.0 / (lengthV v)
                in  scaleV v scale
 
 stateDistance :: (FL.FixedList f) => f Double -> f Double -> Double
-stateDistance s1 s2 = lengthV $ s2 `minus` s1
+stateDistance s1 s2 = lengthV $ s2 `minusV` s1
 
 stateDistanceSqrd :: (FL.FixedList f) => f Double -> f Double -> Double
 stateDistanceSqrd s1 s2 = let dv = s2 `minusV` s1
