@@ -1,6 +1,6 @@
 import Data.StateSpace
 import Data.Spaces.RealVectorStateSpace (makeRealVectorStateSpace)
-import Data.MotionPlanningProblem (MotionPlanningProblem(..))
+import Data.MotionPlanningProblem
 import Planners.RRT (solveRRTDefaultSeed, getNumStates)
 
 import Data.FixedList
@@ -8,10 +8,11 @@ import Data.FixedList
 main :: IO ()
 main = let minState = 0.0 :. 0.0 :. 0.0 :. Nil
            maxState = 1.0 :. 1.0 :. 1.0 :. Nil
+           ss = makeRealVectorStateSpace minState maxState
            p = MotionPlanningProblem
-               { _stateSpace = makeRealVectorStateSpace minState maxState
+               { _stateSpace = ss
                , _startState = minState
-               , _goalState = maxState
+               , _goalSatisfied = goalStateSatisfied ss 0.01 maxState
                , _motionValidity = \_ _ -> True }
            motionPlan = solveRRTDefaultSeed p 0.01 1000
            planLength = Prelude.length motionPlan

@@ -59,7 +59,7 @@ data RRT s g = RRT
     , _stepSize :: Double
     , _tree     :: RoseTree s
     , _stateIdx :: [(s, TreePath)]
-    , _closestToGoal :: Maybe (s, Double, TreePath)}
+    , _solution :: Maybe TreePath}
 
 getSpace :: RRT s g -> StateSpace s g
 getSpace = _stateSpace . _problem
@@ -99,28 +99,24 @@ extendRRT :: RRT s g -> s -> RRT s g
 extendRRT rrt sample =
     let (near,ps) = nearestNode rrt sample
         newState = let d = (getDist rrt) near sample
-                   in  if d <= (_stepSize rrt)
+                   in  if d <= _stepSize rrt
                        then (getInterp rrt) near sample 1.0
-                       else (getInterp rrt) near sample $ (_stepSize rrt) / d
+                       else (getInterp rrt) near sample $ ((_stepSize rrt) / d)
     in  newState `seq`
-        if (getValidityFn rrt) sample newState
+        if (getValidityFn rrt) near newState
         then let (newTree, newIdx) = addChildAt (_tree rrt) ps newState
-                 newGoalDist = (getNonMetricDist rrt) newState (_goalState $ _problem $ rrt)
                  newPath = ps ++ [newIdx]
+                 solution = if   (_goalSatisfied $ _problem rrt) newState
+                            then Just newPath
+                            else Nothing
                  newRRT = RRT
                           (_problem rrt)
                           (_stepSize rrt)
                           newTree
                           ((newState,newPath) : (_stateIdx rrt))
-                          (getNearGoal (_closestToGoal rrt) (Just (newState, newGoalDist, newPath)))
+                          Nothing
              in  newRRT
         else rrt
-  where getNearGoal Nothing Nothing = Nothing
-        getNearGoal a Nothing = a
-        getNearGoal Nothing a = a
-        getNearGoal (Just (s1, d1, p1)) (Just (s2, d2, p2))
-          | d2 < d1 = Just (s2, d2, p2)
-          | otherwise = Just (s1, d1, p1)
 
 buildRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g (RRT s g)
 buildRRT problem stepSize numIterations =
@@ -130,19 +126,17 @@ buildRRT problem stepSize numIterations =
     where
       go rrt iteration
         | iteration >= numIterations = return rrt
-        | reachedGoal $ _closestToGoal rrt = return rrt
+        | isJust $ _solution rrt = return rrt
         | otherwise = do
           newRRT <- (extendRRT rrt) `fmap` sample
           go newRRT (iteration + 1)
-        where reachedGoal Nothing = False
-              reachedGoal (Just (_,d,_)) = d <= 0.01*0.01
-              sample = _sampleUniform $ _stateSpace problem
+        where sample = _sampleUniform $ _stateSpace problem
 
 getPathToGoal :: RandomGen g => RRT s g -> [s]
 getPathToGoal rrt =
-  case _closestToGoal rrt of
+  case _solution rrt of
     Nothing -> []
-    Just (_,_,path) -> getPathNodes (_tree rrt) path
+    Just path -> getPathNodes (_tree rrt) path
 
 solveRRT :: RandomGen g => MotionPlanningProblem s g -> Double -> Int -> CMR.Rand g [s]
 solveRRT problem stepSize numIterations =

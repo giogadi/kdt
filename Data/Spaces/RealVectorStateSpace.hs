@@ -36,7 +36,8 @@ stateDistanceSqrd s1 s2 = let dv = s2 `minusV` s1
 
 interpolate :: (FL.FixedList f) => f Double -> f Double -> Double -> f Double
 interpolate s1 s2 d
-  | d < 0.0 || d > 1.0 = error "Data.Point2DSpace.interpolate's parameter must be in [0,1]"
+  | d < 0.0 || d > (1.0 + 1e-8) =
+    error ("Data.RealVectorStateSpace.interpolate's parameter must be in [0,1]" ++ (show d))
   | otherwise = let v = s2 `minusV` s1
                 in  s1 `addV` (scaleV v d)
 

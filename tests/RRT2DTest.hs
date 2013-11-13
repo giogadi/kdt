@@ -1,7 +1,6 @@
 import Data.StateSpace
 import Data.Spaces.Point2DSpace
-import Data.MotionPlanningProblem (MotionPlanningProblem(..))
-import Data.DiscreteMotionValidator as DMV
+import Data.MotionPlanningProblem
 import Planners.RRT (solveRRTDefaultSeed, buildRRTDefaultSeed, getNumStates, writeRRT)
 
 data Circle2D = Circle2D
@@ -20,8 +19,8 @@ main = let minState = Point2D 0.0 0.0
            p = MotionPlanningProblem
                { _stateSpace = ss
                , _startState = minState
-               , _goalState = maxState
-               , _motionValidity = DMV.motionValid ss (pointOutsideCircle circleObs) 0.002 }
+               , _goalSatisfied = goalStateSatisfied ss 0.01 maxState
+               , _motionValidity = discreteMotionValid ss (pointOutsideCircle circleObs) 0.002 }
            -- motionPlan = solveRRTDefaultSeed p 0.01 5000
            rrt = buildRRTDefaultSeed p 0.01 5000
            -- planLength = length motionPlan
