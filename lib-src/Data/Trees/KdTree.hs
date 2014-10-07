@@ -1,5 +1,5 @@
 module Data.Trees.KdTree
-       ( EuclideanSpace (..)
+       ( KdSpace (..)
        , KdTree
        , buildKdTree
        , nearestNeighbor
@@ -10,11 +10,11 @@ module Data.Trees.KdTree
        ) where
 
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (EuclideanSpace (..))
+import Data.Trees.KdMap (KdSpace (..))
 
 type KdTree p = KDM.KdMap p ()
 
-buildKdTree :: EuclideanSpace p -> [p] -> KdTree p
+buildKdTree :: KdSpace p -> [p] -> KdTree p
 buildKdTree _ [] = error "KdTree must be build with a non-empty list."
 buildKdTree s ps = KDM.buildKdMap s $ zip ps $ repeat ()
 

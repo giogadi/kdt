@@ -3,8 +3,8 @@
 -- TODO: Implement range find?
 module Data.Trees.DynamicKdTree
        ( DkdTree
-       , KDM.EuclideanSpace (..)
-       , KDM.mk2DEuclideanSpace
+       , KdSpace (..)
+       , mk2DEuclideanSpace
        , emptyDkdTree
        , singleton
        , nearestNeighbor
@@ -12,16 +12,19 @@ module Data.Trees.DynamicKdTree
        , kNearestNeighbors
        , insert
        , insertPair
-       , Data.Trees.DynamicKdTree.null
+       , null
        , size
        , toList
        , batchInsert
        , runTests
        ) where
 
+import Prelude hiding (null)
+
 import Data.Bits
 import Data.Function
-import Data.List hiding (insert)
+import Data.List hiding (insert, null)
+import qualified Data.List (null)
 
 import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
@@ -29,23 +32,24 @@ import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
 
 import qualified Data.Trees.KdMap as KDM
+import Data.Trees.KdMap (KdSpace, mk2DEuclideanSpace)
 
 data DkdTree k v = DkdTree
                   { _trees    :: [KDM.KdMap k v]
-                  , _space    :: KDM.EuclideanSpace k
+                  , _space    :: KDM.KdSpace k
                   , _numNodes :: Int
                   } deriving Generic
 instance (NFData k, NFData v) => NFData (DkdTree k v) where rnf = genericRnf
 
 -- TODO remove this
-emptyDkdTree :: KDM.EuclideanSpace k -> DkdTree k v
+emptyDkdTree :: KDM.KdSpace k -> DkdTree k v
 emptyDkdTree s = DkdTree [] s 0
 
 null :: DkdTree k v -> Bool
 null (DkdTree [] _ _) = True
 null _ = False
 
-singleton :: KDM.EuclideanSpace k -> (k, v) -> DkdTree k v
+singleton :: KDM.KdSpace k -> (k, v) -> DkdTree k v
 singleton s (p, d) = DkdTree [KDM.buildKdMap s [(p, d)]] s 1
 
 nearestNeighbor :: DkdTree k v -> k -> (k, v)
@@ -53,7 +57,7 @@ nearestNeighbor (DkdTree ts s _) query =
   let nearests = map (flip KDM.nearestNeighbor query) ts
   in  if   Data.List.null nearests
       then error "Called nearestNeighbor on empty DkdTree."
-      else minimumBy (compare `on` (KDM._dist2 s query . fst)) nearests
+      else minimumBy (compare `on` (KDM._distSqr s query . fst)) nearests
 
 insert :: DkdTree k v -> k -> v -> DkdTree k v
 insert (DkdTree trees s n) p d =
@@ -75,8 +79,8 @@ kNearestNeighbors (DkdTree trees s _) k query =
        merge xs@(x:xt) ys@(y:yt)
          | distX <= distY = x : merge xt ys
          | otherwise      = y : merge xs yt
-        where distX = (KDM._dist2 s) query $ fst x
-              distY = (KDM._dist2 s) query $ fst y
+        where distX = (KDM._distSqr s) query $ fst x
+              distY = (KDM._distSqr s) query $ fst y
 
 nearNeighbors :: DkdTree k v -> Double -> k -> [(k, v)]
 nearNeighbors (DkdTree trees _ _) radius query =
@@ -98,14 +102,14 @@ batchInsert t =  foldl' insertPair t
 testElements :: [k] -> [(k, Int)]
 testElements ps = zip ps [1 ..]
 
-checkLogNTrees :: KDM.EuclideanSpace k -> [k] -> Bool
+checkLogNTrees :: KDM.KdSpace k -> [k] -> Bool
 checkLogNTrees s ps = let lengthIsLogN (DkdTree ts _ n) = length ts == popCount n
                       in  all lengthIsLogN $ scanl insertPair (emptyDkdTree s) $ testElements ps
 
 prop_logNTrees :: [KDM.Point2d] -> Bool
 prop_logNTrees = checkLogNTrees KDM.mk2DEuclideanSpace
 
-checkTreeSizesPowerOf2 :: KDM.EuclideanSpace k -> [k] -> Bool
+checkTreeSizesPowerOf2 :: KDM.KdSpace k -> [k] -> Bool
 checkTreeSizesPowerOf2 s ps =
   let sizesPowerOf2 (DkdTree ts _ _) = all (== 1) $ map (popCount . length . KDM.toList) ts
   in  all sizesPowerOf2 $ scanl insertPair (emptyDkdTree s) $ testElements ps
@@ -113,7 +117,7 @@ checkTreeSizesPowerOf2 s ps =
 prop_treeSizesPowerOf2 :: [KDM.Point2d] -> Bool
 prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 KDM.mk2DEuclideanSpace
 
-checkNumElements :: KDM.EuclideanSpace k -> [k] -> Bool
+checkNumElements :: KDM.KdSpace k -> [k] -> Bool
 checkNumElements s ps =
   let numsMatch (num, DkdTree ts _ n) = n == num && n == (sum $ map (length . KDM.toList) ts)
   in  all numsMatch $ zip [0..] $ scanl insertPair (emptyDkdTree s) $ testElements ps
@@ -121,7 +125,7 @@ checkNumElements s ps =
 prop_validNumElements :: [KDM.Point2d] -> Bool
 prop_validNumElements = checkNumElements KDM.mk2DEuclideanSpace
 
-checkNearestEqualToBatch :: Eq k => KDM.EuclideanSpace k -> ([k], k) -> Bool
+checkNearestEqualToBatch :: Eq k => KDM.KdSpace k -> ([k], k) -> Bool
 checkNearestEqualToBatch s (ps, query) =
   let kdt = KDM.buildKdMap s $ testElements ps
       kdtAnswer = KDM.nearestNeighbor kdt query
@@ -134,7 +138,7 @@ prop_nearestEqualToBatch query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkNearestEqualToBatch KDM.mk2DEuclideanSpace (xs, query)
 
-checkKNearestEqualToBatch :: Eq k => KDM.EuclideanSpace k -> ([k], Int, k) -> Bool
+checkKNearestEqualToBatch :: Eq k => KDM.KdSpace k -> ([k], Int, k) -> Bool
 checkKNearestEqualToBatch s (ps, k, query) =
   let kdt = KDM.buildKdMap s $ testElements ps
       kdtAnswer = KDM.kNearestNeighbors kdt k query
@@ -148,7 +152,7 @@ prop_kNearestEqualToBatch query =
     forAll (choose (1, length xs)) $ \k ->
       checkKNearestEqualToBatch KDM.mk2DEuclideanSpace (xs, k, query)
 
-checkNearEqualToBatch :: Ord k => KDM.EuclideanSpace k -> ([k], Double, k) -> Bool
+checkNearEqualToBatch :: Ord k => KDM.KdSpace k -> ([k], Double, k) -> Bool
 checkNearEqualToBatch s (ps, radius, query) =
   let kdt = KDM.buildKdMap s $ testElements ps
       kdtAnswer = KDM.nearNeighbors kdt radius query
