@@ -20,7 +20,6 @@ import GHC.Generics
 import Data.Function
 import qualified Data.List as L
 import qualified Data.PQueue.Prio.Max as Q
-import qualified Data.Set as S
 import qualified Data.Vector as V
 import Test.QuickCheck
 
@@ -253,7 +252,7 @@ checkNearEqualToLinear s radius (ps, query) =
   let kdt = buildKdTree s $ testElements ps
       kdtNear = nearNeighbors kdt radius query
       linearNear = nearNeighborsLinear s (testElements ps) query radius
-  in  S.fromList kdtNear == S.fromList linearNear
+  in  L.sort kdtNear == L.sort linearNear
 
 prop_nearEqualToLinear :: Point2d -> Property
 prop_nearEqualToLinear query =
@@ -270,7 +269,7 @@ checkKNearestEqualToLinear s k (xs, query) =
   let kdt = buildKdTree s $ testElements xs
       kdtKNear = kNearestNeighbors kdt k query
       linearKNear = kNearestNeighborsLinear s (testElements xs) query k
-  in  S.fromList kdtKNear == S.fromList linearKNear
+  in  kdtKNear == linearKNear
 
 prop_kNearestEqualToLinear :: Point2d -> Property
 prop_kNearestEqualToLinear query =

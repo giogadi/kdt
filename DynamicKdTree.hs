@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
 -- TODO: Implement range find?
 module Data.Trees.DynamicKdTree
@@ -14,14 +14,7 @@ module Data.Trees.DynamicKdTree
        , size
        , toList
        , batchInsert
-       -- Begin Tests
-       , checkLogNTrees
-       , checkTreeSizesPowerOf2
-       , checkNumElements
-       , checkNearestEqualToBatch
-       , checkKNearestEqualToBatch
-       , checkEqualToLinear
-       , module Test.QuickCheck
+       , runTests
        ) where
 
 import Data.Bits
@@ -56,7 +49,6 @@ nearestNeighbor (DkdTree ts s _) query =
       then error "Called nearestNeighbor on empty DkdTree."
       else minimumBy (compare `on` (KDT._dist2 s query . fst)) nearests
 
--- TODO: separate (p, d) into distinct arguments
 insert :: DkdTree p d -> p -> d -> DkdTree p d
 insert (DkdTree trees s n) p d =
   let bitList = map (((.&.) 1) . (n `shiftR`)) [0..]
@@ -68,7 +60,7 @@ insert (DkdTree trees s n) p d =
 insertPair :: DkdTree p d -> (p, d) -> DkdTree p d
 insertPair t = uncurry (insert t)
 
-kNearestNeighbors :: Eq p => DkdTree p d -> Int -> p -> [(p, d)]
+kNearestNeighbors :: DkdTree p d -> Int -> p -> [(p, d)]
 kNearestNeighbors (DkdTree trees s _) k query =
   let neighborSets = map (\t -> KDT.kNearestNeighbors t k query) trees
   in  take k $ foldr merge [] neighborSets
@@ -79,6 +71,10 @@ kNearestNeighbors (DkdTree trees s _) k query =
          | otherwise      = y : merge xs yt
         where distX = (KDT._dist2 s) query $ fst x
               distY = (KDT._dist2 s) query $ fst y
+
+nearNeighbors :: DkdTree p d -> Double -> p -> [(p, d)]
+nearNeighbors (DkdTree trees _ _) radius query =
+  concatMap (\t -> KDT.nearNeighbors t radius query) trees
 
 size :: DkdTree p d -> Int
 size (DkdTree _ _ n) = n
@@ -94,49 +90,73 @@ batchInsert t =  foldl' insertPair t
 --------------------------------------------------------------------------------
 
 testElements :: [p] -> [(p, Int)]
-testElements ps = zip ps [1..]
+testElements ps = zip ps [1 ..]
 
 checkLogNTrees :: KDT.EuclideanSpace p -> [p] -> Bool
 checkLogNTrees s ps = let lengthIsLogN (DkdTree ts _ n) = length ts == popCount n
                       in  all lengthIsLogN $ scanl insertPair (emptyDkdTree s) $ testElements ps
+
+prop_logNTrees :: [KDT.Point2d] -> Bool
+prop_logNTrees = checkLogNTrees KDT.mk2DEuclideanSpace
 
 checkTreeSizesPowerOf2 :: KDT.EuclideanSpace p -> [p] -> Bool
 checkTreeSizesPowerOf2 s ps =
   let sizesPowerOf2 (DkdTree ts _ _) = all (== 1) $ map (popCount . length . KDT.toList) ts
   in  all sizesPowerOf2 $ scanl insertPair (emptyDkdTree s) $ testElements ps
 
+prop_treeSizesPowerOf2 :: [KDT.Point2d] -> Bool
+prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 KDT.mk2DEuclideanSpace
+
 checkNumElements :: KDT.EuclideanSpace p -> [p] -> Bool
 checkNumElements s ps =
   let numsMatch (num, DkdTree ts _ n) = n == num && n == (sum $ map (length . KDT.toList) ts)
   in  all numsMatch $ zip [0..] $ scanl insertPair (emptyDkdTree s) $ testElements ps
 
+prop_validNumElements :: [KDT.Point2d] -> Bool
+prop_validNumElements = checkNumElements KDT.mk2DEuclideanSpace
+
 checkNearestEqualToBatch :: Eq p => KDT.EuclideanSpace p -> ([p], p) -> Bool
-checkNearestEqualToBatch _ ([], _) = True
 checkNearestEqualToBatch s (ps, query) =
   let kdt = KDT.buildKdTree s $ testElements ps
       kdtAnswer = KDT.nearestNeighbor kdt query
-      dkdt = foldl' insertPair (emptyDkdTree s) $ testElements ps
+      dkdt = batchInsert (emptyDkdTree s) $ testElements ps
       dkdtAnswer = nearestNeighbor dkdt query
   in  dkdtAnswer == kdtAnswer
 
-checkKNearestEqualToBatch :: Eq p => KDT.EuclideanSpace p -> ([p], p) -> Bool
-checkKNearestEqualToBatch _ ([], _) = True
-checkKNearestEqualToBatch s (ps, query) =
-  let k = 10 -- TODO make this quick-checked and bounded by something reasonable
-      kdt = KDT.buildKdTree s $ testElements ps
+prop_nearestEqualToBatch :: KDT.Point2d -> Property
+prop_nearestEqualToBatch query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    checkNearestEqualToBatch KDT.mk2DEuclideanSpace (xs, query)
+
+checkKNearestEqualToBatch :: Eq p => KDT.EuclideanSpace p -> ([p], Int, p) -> Bool
+checkKNearestEqualToBatch s (ps, k, query) =
+  let kdt = KDT.buildKdTree s $ testElements ps
       kdtAnswer = KDT.kNearestNeighbors kdt k query
-      dkdt = foldl' insertPair (emptyDkdTree s) $ testElements ps
+      dkdt = batchInsert (emptyDkdTree s) $ testElements ps
       dkdtAnswer = kNearestNeighbors dkdt k query
   in  dkdtAnswer == kdtAnswer
 
-nearestNeighborLinear :: KDT.EuclideanSpace p -> [(p, d)] -> p -> (p, d)
-nearestNeighborLinear s xs query =
-  minimumBy (compare `on` (KDT._dist2 s query . fst)) xs
+prop_kNearestEqualToBatch :: KDT.Point2d -> Property
+prop_kNearestEqualToBatch query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    forAll (choose (1, length xs)) $ \k ->
+      checkKNearestEqualToBatch KDT.mk2DEuclideanSpace (xs, k, query)
 
-checkEqualToLinear :: Eq p => KDT.EuclideanSpace p -> ([p], p) -> Bool
-checkEqualToLinear _ ([], _) = True
-checkEqualToLinear s (ps, query) =
-  let (testElem1 : testElems) = testElements ps
-      linears = scanl (\xs x -> xs ++ [x]) [testElem1] $ testElems
-      dkdts   = scanl insertPair (singleton s testElem1) $ testElems
-  in  map (\xs -> nearestNeighborLinear s xs query) linears == map (`nearestNeighbor` query) dkdts
+checkNearEqualToBatch :: Ord p => KDT.EuclideanSpace p -> ([p], Double, p) -> Bool
+checkNearEqualToBatch s (ps, radius, query) =
+  let kdt = KDT.buildKdTree s $ testElements ps
+      kdtAnswer = KDT.nearNeighbors kdt radius query
+      dkdt = batchInsert (emptyDkdTree s) $ testElements ps
+      dkdtAnswer = nearNeighbors dkdt radius query
+  in  sort dkdtAnswer == sort kdtAnswer
+
+prop_checkNearEqualToBatch :: KDT.Point2d -> Property
+prop_checkNearEqualToBatch query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    forAll (choose (0.0, 1000.0)) $ \radius ->
+      checkNearEqualToBatch KDT.mk2DEuclideanSpace (xs, radius, query)
+
+-- Run all tests
+return []
+runTests :: IO Bool
+runTests =  $quickCheckAll
