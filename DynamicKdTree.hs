@@ -8,6 +8,7 @@ module Data.Trees.DynamicKdTree
        , emptyDkdTree
        , singleton
        , nearestNeighbor
+       , nearNeighbors
        , kNearestNeighbors
        , insert
        , insertPair
