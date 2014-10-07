@@ -41,7 +41,7 @@ Test-Suite KdTreeTest
 
 benchmark KDTBenchmark
   type:                 exitcode-stdio-1.0
-  main-is:              Tests/KdTreeTest.hs
+  main-is:              Benchmarks/KDTBenchmark.hs
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
   build-depends:        base >=4.7 && <4.8,

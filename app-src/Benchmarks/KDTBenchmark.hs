@@ -33,7 +33,7 @@ main =
   let seed = 1
       numPoints = 100000
       treePoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT seed
-      kdt5000 = buildKdTree mk2DEuclideanSpace $ zip (take 5000 treePoints) $ repeat ()
+      kdt5000 = buildKdMap mk2DEuclideanSpace $ zip (take 5000 treePoints) $ repeat ()
       queryPoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT (seed + 1)
   in  defaultMain [
       bgroup "kdtree" [ bench "build-5000" $ nf
