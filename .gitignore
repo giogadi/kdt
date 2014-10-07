@@ -1,0 +1,10 @@
+dist
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+.virthualenv
+*_flymake.hs
+.cabal-sandbox
+cabal.sandbox.config
