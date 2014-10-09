@@ -4,11 +4,13 @@ module Data.Trees.KdMap
        ( KdSpace (..)
        , KdMap
        , buildKdMap
-       , toList
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
        , size
+       , assocs
+       , keys
+       , values
        , mk2DEuclideanSpace
        , Point2d (..)
        , runTests
@@ -18,6 +20,7 @@ import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
+import Data.Foldable
 import Data.Function
 import qualified Data.List as L
 import qualified Data.PQueue.Prio.Max as Q
@@ -41,8 +44,22 @@ data TreeNode k v = TreeNode { treeLeft :: Maybe (TreeNode k v)
                              deriving Generic
 instance (NFData k, NFData v) => NFData (TreeNode k v) where rnf = genericRnf
 
+mapTreeNode :: (v1 -> v2) -> TreeNode k v1 -> TreeNode k v2
+mapTreeNode f (TreeNode maybeLeft (k, v) maybeRight) =
+  TreeNode (fmap (mapTreeNode f) maybeLeft) (k, f v) (fmap (mapTreeNode f) maybeRight)
+
 data KdMap k v = KdMap (KdSpace k) (TreeNode k v) Int deriving Generic
 instance (NFData k, NFData v) => NFData (KdMap k v) where rnf = genericRnf
+
+instance Functor (KdMap k) where
+  fmap f (KdMap s t n) = KdMap s (mapTreeNode f t) n
+
+instance Foldable (KdMap k) where
+  foldr f z (KdMap _ t _) = go f z t
+    where go f' z' (TreeNode Nothing (_, v) Nothing) = f' v z'
+          go f' z' (TreeNode (Just l) (_, v) Nothing) = go f' (f' v z') l
+          go f' z' (TreeNode Nothing (_, v) (Just r)) = f' v (go f' z' r)
+          go f' z' (TreeNode (Just l) (_, v) (Just r)) = go f' (f' v (go f' z' r)) l
 
 buildTreeInternal :: KdSpace k -> [V.Vector (k, v)] -> Int -> TreeNode k v
 buildTreeInternal s sortedByAxis axis
@@ -77,14 +94,16 @@ buildKdMap s ps = let sortByAxis points a = L.sortBy (compare `on` (_coord s a .
                       sortedByAxis = map (V.fromList . sortByAxis ps) [0 .. (_numDimensions s - 1)]
                   in  KdMap s (buildTreeInternal s sortedByAxis 0) $ length ps
 
--- TODO: just make KdMap foldable I guess
-toListInternal :: TreeNode k v -> [(k, v)]
-toListInternal t = go (Just t) []
+assocs :: KdMap k v -> [(k, v)]
+assocs (KdMap _ t _) = go (Just t) []
   where go Nothing = id
         go (Just (TreeNode l p r)) = go l . (p :) . go r
 
-toList :: KdMap k v -> [(k, v)]
-toList (KdMap _ t _) = toListInternal t
+keys :: KdMap k v -> [k]
+keys = map fst . assocs
+
+values :: KdMap k v -> [v]
+values = map snd . assocs
 
 isTreeValid :: KdSpace k -> Int -> TreeNode k v -> Bool
 isTreeValid s axis (TreeNode l (p, _) r) =

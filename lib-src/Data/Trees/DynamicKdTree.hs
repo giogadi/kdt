@@ -64,7 +64,7 @@ insert (DkdTree trees s n) p d =
   let bitList = map (((.&.) 1) . (n `shiftR`)) [0..]
       (onesPairs, theRestPairs) = span ((== 1) . fst) $ zip bitList trees
       ((_, ones), (_, theRest)) = (unzip onesPairs, unzip theRestPairs)
-      newTree = KDM.buildKdMap s $ (p, d) : concatMap KDM.toList ones
+      newTree = KDM.buildKdMap s $ (p, d) : concatMap KDM.assocs ones
   in  DkdTree (newTree : theRest) s $ n + 1
 
 insertPair :: DkdTree k v -> (k, v) -> DkdTree k v
@@ -90,7 +90,7 @@ size :: DkdTree k v -> Int
 size (DkdTree _ _ n) = n
 
 toList :: DkdTree k v -> [(k, v)]
-toList (DkdTree trees _ _) = concatMap KDM.toList trees
+toList (DkdTree trees _ _) = concatMap KDM.assocs trees
 
 batchInsert :: DkdTree k v -> [(k, v)] -> DkdTree k v
 batchInsert t =  foldl' insertPair t
@@ -111,7 +111,7 @@ prop_logNTrees = checkLogNTrees KDM.mk2DEuclideanSpace
 
 checkTreeSizesPowerOf2 :: KDM.KdSpace k -> [k] -> Bool
 checkTreeSizesPowerOf2 s ps =
-  let sizesPowerOf2 (DkdTree ts _ _) = all (== 1) $ map (popCount . length . KDM.toList) ts
+  let sizesPowerOf2 (DkdTree ts _ _) = all (== 1) $ map (popCount . length . KDM.assocs) ts
   in  all sizesPowerOf2 $ scanl insertPair (emptyDkdTree s) $ testElements ps
 
 prop_treeSizesPowerOf2 :: [KDM.Point2d] -> Bool
@@ -119,7 +119,7 @@ prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 KDM.mk2DEuclideanSpace
 
 checkNumElements :: KDM.KdSpace k -> [k] -> Bool
 checkNumElements s ps =
-  let numsMatch (num, DkdTree ts _ n) = n == num && n == (sum $ map (length . KDM.toList) ts)
+  let numsMatch (num, DkdTree ts _ n) = n == num && n == (sum $ map (length . KDM.assocs) ts)
   in  all numsMatch $ zip [0..] $ scanl insertPair (emptyDkdTree s) $ testElements ps
 
 prop_validNumElements :: [KDM.Point2d] -> Bool
