@@ -4,6 +4,7 @@ import Data.Trees.DynamicKdTree
 import Control.Monad
 import qualified Control.Monad.Random as CMR
 import Criterion.Main
+import Data.Function
 import Data.List
 import System.Random.Mersenne.Pure64
 
@@ -28,6 +29,19 @@ interleaveBuildQuery =
       start = (emptyDkdTree mk2DEuclideanSpace, [])
   in  snd . foldl' f start
 
+nearestLinear :: [Point2d] -> Point2d -> Point2d
+nearestLinear ps query = minimumBy (compare `on` (dist query)) ps
+  where dist = _distSqr $ mk2DEuclideanSpace
+
+linearInterleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
+linearInterleaveBuildQuery =
+  let f :: ([Point2d], [Point2d]) -> (Point2d, Point2d) -> ([Point2d], [Point2d])
+      f (ps, accList) (structPt, queryPt) =
+        let ps' = structPt : ps
+            nearest = nearestLinear ps' queryPt
+        in  (ps', nearest : accList)
+  in  snd . foldl' f ([], [])
+
 main :: IO ()
 main =
   let seed = 1
@@ -36,6 +50,12 @@ main =
       kdt5000 = buildKdMap mk2DEuclideanSpace $ zip (take 5000 treePoints) $ repeat ()
       queryPoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT (seed + 1)
   in  defaultMain [
+      bgroup "linear" [ bench "build-5000-query-5000" $ nf
+                          (map (nearestLinear (take 5000 treePoints))) (take 5000 queryPoints),
+                        bench "interleave-5000" $ nf
+                          linearInterleaveBuildQuery
+                          (zip (take 5000 treePoints) (take 5000 queryPoints))
+                      ],
       bgroup "kdtree" [ bench "build-5000" $ nf
                           (buildKdMap mk2DEuclideanSpace) (zip (take 5000 treePoints) $ repeat ()),
                         bench "build-5000-query-5000" $ nf
@@ -53,6 +73,6 @@ main =
                            (zip (take 5000 treePoints) $ repeat ()),
                          bench "interleave-5000" $ nf
                            interleaveBuildQuery
-                           (zip (take 5000 treePoints) queryPoints)
+                           (zip (take 5000 treePoints) (take 5000 queryPoints))
                        ]
       ]

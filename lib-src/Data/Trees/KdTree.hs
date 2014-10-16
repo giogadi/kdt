@@ -12,8 +12,6 @@ module Data.Trees.KdTree
 import qualified Data.Trees.KdMap as KDM
 import Data.Trees.KdMap (KdSpace (..))
 
-import Data.Foldable
-
 newtype KdTree p = KdTree (KDM.KdMap p ())
 
 buildKdTree :: KdSpace p -> [p] -> KdTree p

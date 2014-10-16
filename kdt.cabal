@@ -21,6 +21,7 @@ library
                        Data.Trees.DynamicKdTree
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
+  ghc-prof-options:    -Wall -O3 -fprof-auto
   build-depends:       base >=4.7 && <4.8,
                        deepseq >=1.3 && <1.4,
                        QuickCheck >=2.7 && <2.8,
@@ -44,6 +45,8 @@ benchmark KDTBenchmark
   main-is:              Benchmarks/KDTBenchmark.hs
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
+  ghc-prof-options:     -Wall -O3 -fprof-auto
+                        "-with-rtsopts=-p"
   build-depends:        base >=4.7 && <4.8,
                         kdt -any,
                         MonadRandom >= 0.1.12 && <0.2,
