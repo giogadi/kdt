@@ -54,7 +54,10 @@ main =
                           (map (nearestLinear (take 5000 treePoints))) (take 5000 queryPoints),
                         bench "interleave-5000" $ nf
                           linearInterleaveBuildQuery
-                          (zip (take 5000 treePoints) (take 5000 queryPoints))
+                          (zip (take 5000 treePoints) (take 5000 queryPoints)),
+                        bench "interleave-10000" $ nf
+                          linearInterleaveBuildQuery
+                          (zip (take 10000 treePoints) (take 10000 queryPoints))
                       ],
       bgroup "kdtree" [ bench "build-5000" $ nf
                           (buildKdMap mk2DEuclideanSpace) (zip (take 5000 treePoints) $ repeat ()),
@@ -73,6 +76,9 @@ main =
                            (zip (take 5000 treePoints) $ repeat ()),
                          bench "interleave-5000" $ nf
                            interleaveBuildQuery
-                           (zip (take 5000 treePoints) (take 5000 queryPoints))
+                           (zip (take 5000 treePoints) (take 5000 queryPoints)),
+                         bench "interleave-10000" $ nf
+                           interleaveBuildQuery
+                           (zip (take 10000 treePoints) (take 10000 queryPoints))
                        ]
       ]
