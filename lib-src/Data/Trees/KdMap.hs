@@ -23,6 +23,7 @@ import GHC.Generics
 import Data.Foldable
 import Data.Function
 import qualified Data.List as L
+import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import qualified Data.Vector as V
 import Test.QuickCheck
@@ -61,38 +62,64 @@ instance Foldable (KdMap k) where
           go f' z' (TreeNode Nothing (_, v) (Just r)) = f' v (go f' z' r)
           go f' z' (TreeNode (Just l) (_, v) (Just r)) = go f' (f' v (go f' z' r)) l
 
-buildTreeInternal :: KdSpace k -> [V.Vector (k, v)] -> Int -> TreeNode k v
-buildTreeInternal s sortedByAxis axis
-  | n == 1 = TreeNode Nothing (V.head $ head sortedByAxis) Nothing
+quickselect :: Ord a => Int -> [a] -> a
+quickselect k (x:xs) | k < l     = quickselect k ys
+                     | k > l     = quickselect (k-l-1) zs
+                     | otherwise = x
+  where (ys, zs) = L.partition (< x) xs
+        l = length ys
+
+-- partitionOnSelect :: (a -> a -> Ordering) -> Int -> [a] -> ([a], a, [a])
+-- partitionOnSelect cmp k (x : xs)
+--   | k < l  = let (a, b, c) = partitionOnSelect cmp k ys
+--              in  (a, b, x : (c ++ zs))
+--   | k > l  = let (a, b, c) = partitionOnSelect cmp (k - l - 1) zs
+--              in  (x : (a ++ ys), b, c)
+--   | otherwise = (ys, x, zs)
+--   where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
+--         l = length ys
+
+-- buildTreeInternal :: KdSpace k -> [(k, v)] -> Int -> TreeNode k v
+-- buildTreeInternal _ [p] _ = TreeNode Nothing p Nothing
+-- buildTreeInternal s ps axis =
+--   let (lessPoints, median, greaterPoints) = partitionOnSelect
+--         (comparing (_coord s axis . fst)) (length ps `div` 2) ps -- TODO EW LENGTH
+--       maybeBuildTree [] = Nothing
+--       maybeBuildTree ps' = Just $ buildTreeInternal s ps' $ incrementAxis s axis
+--   in  TreeNode
+--       { treeLeft = maybeBuildTree lessPoints
+--       , treePoint = median
+--       , treeRight = maybeBuildTree greaterPoints
+--       }
+
+buildTreeInternal :: KdSpace k -> V.Vector (k, v) -> Int -> TreeNode k v
+buildTreeInternal s ps axis
+  | n == 1 = TreeNode Nothing (V.head ps) Nothing
   | otherwise =
-    let medianIx = n `div` 2 :: Int
-        median   = (sortedByAxis !! axis) V.! medianIx
-        splitVal = _coord s axis $ fst median
-        partitionVec vec vAxis =
-          if vAxis == axis
-          then let (left, medAndRight) = V.splitAt medianIx vec
-               in  (left, V.tail medAndRight)
-          else let (left, medAndRight) = V.partition ((< splitVal) . _coord s axis . fst) vec
-               in  case V.findIndex ((== splitVal) . _coord s axis . fst) medAndRight of
-                     Just ix -> let (l, r) = V.splitAt ix medAndRight
-                                in  (left, l V.++ V.tail r)
-                     Nothing -> error "we done fucked up yo"
-        (leftPoints, rightPoints) = unzip $ zipWith partitionVec sortedByAxis [0..]
+    let enumerated = zip (map (_coord s axis . fst) $ toList ps) [0 ..]
+        (medianVal, medianIx) = quickselect (n `div` 2) enumerated
+        -- TODO find better way to partition without middle element
+        (leftOfMedian, medAndRightOfMedian) = V.splitAt medianIx ps
+        (lessPoints, greaterPoints) =
+          V.unstablePartition ((< medianVal) . _coord s axis . fst)
+            (leftOfMedian V.++ V.tail medAndRightOfMedian)
+        maybeBuildTree ps'
+          | V.null ps' = Nothing
+          | otherwise = Just $ buildTreeInternal s ps' $ incrementAxis s axis
     in  TreeNode
-        { treeLeft = maybeBuildTree leftPoints
-        , treePoint = median
-        , treeRight = maybeBuildTree rightPoints
+        { treeLeft = maybeBuildTree lessPoints
+        , treePoint = V.head medAndRightOfMedian
+        , treeRight = maybeBuildTree greaterPoints
         }
-  where n = V.length $ head sortedByAxis
-        maybeBuildTree ps
-          | V.null $ head ps = Nothing
-          | otherwise = Just $ buildTreeInternal s ps $ incrementAxis s axis
+  where n = V.length ps
+
+-- buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
+-- buildKdMap _ [] = error "KdMap must be built with a non-empty list."
+-- buildKdMap s ps = KdMap s (buildTreeInternal s ps 0) $ length ps
 
 buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
 buildKdMap _ [] = error "KdMap must be built with a non-empty list."
-buildKdMap s ps = let sortByAxis points a = L.sortBy (compare `on` (_coord s a . fst)) points
-                      sortedByAxis = map (V.fromList . sortByAxis ps) [0 .. (_numDimensions s - 1)]
-                  in  KdMap s (buildTreeInternal s sortedByAxis 0) $ length ps
+buildKdMap s ps = KdMap s (buildTreeInternal s (V.fromList ps) 0) $ length ps
 
 assocs :: KdMap k v -> [(k, v)]
 assocs (KdMap _ t _) = go (Just t) []
