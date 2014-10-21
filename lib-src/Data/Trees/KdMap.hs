@@ -20,12 +20,17 @@ import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
+import Control.Monad
+import Control.Monad.Primitive
+import Control.Monad.ST.Safe
 import Data.Foldable
 import Data.Function
 import qualified Data.List as L
+import Data.Maybe
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import qualified Data.Vector as V
+import qualified Data.Vector.Generic.Mutable as GM
 import Test.QuickCheck
 
 data KdSpace k = KdSpace
@@ -62,64 +67,91 @@ instance Foldable (KdMap k) where
           go f' z' (TreeNode Nothing (_, v) (Just r)) = f' v (go f' z' r)
           go f' z' (TreeNode (Just l) (_, v) (Just r)) = go f' (f' v (go f' z' r)) l
 
-quickselect :: Ord a => Int -> [a] -> a
-quickselect k (x:xs) | k < l     = quickselect k ys
-                     | k > l     = quickselect (k-l-1) zs
-                     | otherwise = x
-  where (ys, zs) = L.partition (< x) xs
-        l = length ys
+-- partitionIx :: (GM.MVector v a, PrimMonad m) =>
+--   (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> Int -> m Int
+-- partitionIx cmp v left right pivotIx = do
+--   pivot <- GM.unsafeRead v pivotIx
+--   GM.unsafeSwap v pivotIx right
+--   let f storeIx i = do
+--         val <- GM.unsafeRead v i
+--         if (val `cmp` pivot == LT)
+--           then GM.unsafeSwap v storeIx i >> return (storeIx + 1)
+--           else return storeIx
+--   storeIx <- foldM f left [left .. (right - 1)]
+--   GM.unsafeSwap v storeIx right
+--   return storeIx
 
--- partitionOnSelect :: (a -> a -> Ordering) -> Int -> [a] -> ([a], a, [a])
--- partitionOnSelect cmp k (x : xs)
---   | k < l  = let (a, b, c) = partitionOnSelect cmp k ys
---              in  (a, b, x : (c ++ zs))
---   | k > l  = let (a, b, c) = partitionOnSelect cmp (k - l - 1) zs
---              in  (x : (a ++ ys), b, c)
---   | otherwise = (ys, x, zs)
---   where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
---         l = length ys
+-- select :: (GM.MVector v a, PrimMonad m) =>
+--   (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> Int -> m ()
+-- select cmp v l r k = go l r
+--   where go left right
+--           | left > right = error "FUCK OFF"
+--           | left == right = return ()
+--           | otherwise = do
+--               pivotIx <- partitionIx cmp v left right left
+--               case compare k pivotIx of
+--                 EQ -> return ()
+--                 LT -> go left (pivotIx - 1)
+--                 GT -> go (pivotIx + 1) right
 
--- buildTreeInternal :: KdSpace k -> [(k, v)] -> Int -> TreeNode k v
--- buildTreeInternal _ [p] _ = TreeNode Nothing p Nothing
--- buildTreeInternal s ps axis =
---   let (lessPoints, median, greaterPoints) = partitionOnSelect
---         (comparing (_coord s axis . fst)) (length ps `div` 2) ps -- TODO EW LENGTH
---       maybeBuildTree [] = Nothing
---       maybeBuildTree ps' = Just $ buildTreeInternal s ps' $ incrementAxis s axis
---   in  TreeNode
---       { treeLeft = maybeBuildTree lessPoints
---       , treePoint = median
---       , treeRight = maybeBuildTree greaterPoints
---       }
-
-buildTreeInternal :: KdSpace k -> V.Vector (k, v) -> Int -> TreeNode k v
-buildTreeInternal s ps axis
-  | n == 1 = TreeNode Nothing (V.head ps) Nothing
-  | otherwise =
-    let enumerated = zip (map (_coord s axis . fst) $ toList ps) [0 ..]
-        (medianVal, medianIx) = quickselect (n `div` 2) enumerated
-        -- TODO find better way to partition without middle element
-        (leftOfMedian, medAndRightOfMedian) = V.splitAt medianIx ps
-        (lessPoints, greaterPoints) =
-          V.unstablePartition ((< medianVal) . _coord s axis . fst)
-            (leftOfMedian V.++ V.tail medAndRightOfMedian)
-        maybeBuildTree ps'
-          | V.null ps' = Nothing
-          | otherwise = Just $ buildTreeInternal s ps' $ incrementAxis s axis
-    in  TreeNode
-        { treeLeft = maybeBuildTree lessPoints
-        , treePoint = V.head medAndRightOfMedian
-        , treeRight = maybeBuildTree greaterPoints
-        }
-  where n = V.length ps
+-- buildTreeInternal :: KdSpace k -> [(k, v)] -> TreeNode k v
+-- buildTreeInternal s points = fromJust $ runST $ do
+--   let immV = V.fromList points
+--   v <- V.thaw immV
+--   go v 0 0 (V.length immV - 1)
+--   where go v axis left right
+--           | left > right = return Nothing
+--           | left == right = do
+--               p <- GM.read v left
+--               return $ Just $ TreeNode Nothing p Nothing
+--           | otherwise = do
+--               let l = (right - left) + 1
+--                   pivotIx = left + (l `div` 2)
+--                   cmp = comparing (_coord s axis . fst)
+--               select cmp v left right pivotIx
+--               maybeLeft <- go v (incrementAxis s axis) left (pivotIx - 1)
+--               maybeRight <- go v (incrementAxis s axis) (pivotIx + 1) right
+--               pivotPoint <- GM.read v pivotIx
+--               return $ Just $ TreeNode
+--                               { treeLeft = maybeLeft
+--                               , treePoint = pivotPoint
+--                               , treeRight = maybeRight
+--                               }
 
 -- buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
 -- buildKdMap _ [] = error "KdMap must be built with a non-empty list."
--- buildKdMap s ps = KdMap s (buildTreeInternal s ps 0) $ length ps
+-- buildKdMap s ps = KdMap s (buildTreeInternal s ps) $ length ps
+
+quickselect :: (a -> a -> Ordering) -> Int -> [a] -> a
+quickselect cmp = go
+  where go _ [] = error "quickselect must be called on a non-empty list."
+        go k (x:xs) | k < l = go k ys
+                    | k > l = go (k - l - 1) zs
+                    | otherwise = x
+          where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
+                l = length ys
 
 buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
 buildKdMap _ [] = error "KdMap must be built with a non-empty list."
-buildKdMap s ps = KdMap s (buildTreeInternal s (V.fromList ps) 0) $ length ps
+buildKdMap s points = KdMap s (buildTreeInternal points 0) $ length points
+  where buildTreeInternal [p] _ = TreeNode Nothing p Nothing
+        buildTreeInternal ps axis =
+          let n = length ps
+              axisVals = map (_coord s axis . fst) ps
+              axisValsPoints = zip axisVals ps
+              (medianAxisVal, medianPt) =
+                quickselect (comparing fst) (n `div` 2) axisValsPoints
+              f (v, p) (lt, gt) | v < medianAxisVal = (p : lt, gt)
+                                | v > medianAxisVal = (lt, p : gt)
+                                | otherwise = (lt, gt)
+              (leftPoints, rightPoints) = L.foldr f ([], []) axisValsPoints
+              maybeBuildTree [] = Nothing
+              maybeBuildTree ps' = Just $ buildTreeInternal ps' $ incrementAxis s axis
+          in  TreeNode
+              { treeLeft = maybeBuildTree leftPoints
+              , treePoint = medianPt
+              , treeRight = maybeBuildTree rightPoints
+              }
 
 assocs :: KdMap k v -> [(k, v)]
 assocs (KdMap _ t _) = go (Just t) []
@@ -268,6 +300,35 @@ instance Arbitrary Point2d where
 -- Tests
 --------------------------------------------------------------------------------
 
+-- partitionOnMedian :: Ord a => [a] -> ([a], a, [a])
+-- partitionOnMedian xs = runST $ do
+--   v <- GM.new $ length xs
+--   Control.Monad.forM_ (zip [0 ..] xs) $ \(ix, x) -> do GM.write v ix x
+--   partitionOnSelect (compare) v (length xs `div` 2) 0 (length xs)
+--   vFrozen <- V.freeze v
+--   let (left, medAndRight) = V.splitAt ((length xs `div` 2) - 1) vFrozen
+--   return (V.toList left, V.head medAndRight, V.toList $ V.tail medAndRight)
+
+-- check_partitionLeftRight :: [Double] -> Bool
+-- check_partitionLeftRight xs
+--   | length xs < 2 = True
+-- check_partitionLeftRight xs =
+--   let (left, m, right) = partitionOnMedian xs
+--   in  L.all (< m) left && L.all (> m) right
+
+-- prop_partitionLeftRight :: Property
+-- prop_partitionLeftRight = forAll (listOf1 arbitrary) $ check_partitionLeftRight
+
+-- check_partitionElements :: [Double] -> Bool
+-- check_partitionElements xs
+--   | length xs < 2 = True
+-- check_partitionElements xs =
+--   let (left, m, right) = partitionOnMedian xs
+--   in  L.sort (left ++ [m] ++ right) == L.sort xs
+
+-- prop_partitionElements :: Property
+-- prop_partitionElements = forAll (listOf1 arbitrary) $ check_partitionElements
+
 testElements :: [k] -> [(k, Int)]
 testElements ps = zip ps $ [0 ..]
 
@@ -278,6 +339,14 @@ checkValidTree s ps =
 
 prop_validTree :: Property
 prop_validTree = forAll (listOf1 arbitrary) $ checkValidTree mk2DEuclideanSpace
+
+checkElements :: (Ord k, Show k) => KdSpace k -> [k] -> Bool
+checkElements s ps =
+  let kdt = buildKdMap s $ testElements ps
+  in  L.sort (assocs kdt) == L.sort (testElements ps)
+
+prop_sameElements :: Property
+prop_sameElements = forAll (listOf1 arbitrary) $ checkElements mk2DEuclideanSpace
 
 checkNumElements :: KdSpace k -> [k] -> Bool
 checkNumElements s ps =

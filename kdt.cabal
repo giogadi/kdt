@@ -27,7 +27,8 @@ library
                        QuickCheck >=2.7 && <2.8,
                        vector >=0.10 && <0.11,
                        pqueue >=1.2.1 && <1.3,
-                       deepseq-generics >=0.1.1.1
+                       deepseq-generics >=0.1.1.1,
+                       primitive -any
   hs-source-dirs:      lib-src
   default-language:    Haskell2010
 
