@@ -20,17 +20,11 @@ import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
-import Control.Monad
-import Control.Monad.Primitive
-import Control.Monad.ST.Safe
 import Data.Foldable
 import Data.Function
 import qualified Data.List as L
-import Data.Maybe
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
-import qualified Data.Vector as V
-import qualified Data.Vector.Generic.Mutable as GM
 import Test.QuickCheck
 
 data KdSpace k = KdSpace

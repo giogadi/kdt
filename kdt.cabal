@@ -25,10 +25,8 @@ library
   build-depends:       base >=4.7 && <4.8,
                        deepseq >=1.3 && <1.4,
                        QuickCheck >=2.7 && <2.8,
-                       vector >=0.10 && <0.11,
                        pqueue >=1.2.1 && <1.3,
-                       deepseq-generics >=0.1.1.1,
-                       primitive -any
+                       deepseq-generics >=0.1.1.1
   hs-source-dirs:      lib-src
   default-language:    Haskell2010
 
