@@ -61,61 +61,6 @@ instance Foldable (KdMap k) where
           go f' z' (TreeNode Nothing (_, v) (Just r)) = f' v (go f' z' r)
           go f' z' (TreeNode (Just l) (_, v) (Just r)) = go f' (f' v (go f' z' r)) l
 
--- partitionIx :: (GM.MVector v a, PrimMonad m) =>
---   (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> Int -> m Int
--- partitionIx cmp v left right pivotIx = do
---   pivot <- GM.unsafeRead v pivotIx
---   GM.unsafeSwap v pivotIx right
---   let f storeIx i = do
---         val <- GM.unsafeRead v i
---         if (val `cmp` pivot == LT)
---           then GM.unsafeSwap v storeIx i >> return (storeIx + 1)
---           else return storeIx
---   storeIx <- foldM f left [left .. (right - 1)]
---   GM.unsafeSwap v storeIx right
---   return storeIx
-
--- select :: (GM.MVector v a, PrimMonad m) =>
---   (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> Int -> m ()
--- select cmp v l r k = go l r
---   where go left right
---           | left > right = error "FUCK OFF"
---           | left == right = return ()
---           | otherwise = do
---               pivotIx <- partitionIx cmp v left right left
---               case compare k pivotIx of
---                 EQ -> return ()
---                 LT -> go left (pivotIx - 1)
---                 GT -> go (pivotIx + 1) right
-
--- buildTreeInternal :: KdSpace k -> [(k, v)] -> TreeNode k v
--- buildTreeInternal s points = fromJust $ runST $ do
---   let immV = V.fromList points
---   v <- V.thaw immV
---   go v 0 0 (V.length immV - 1)
---   where go v axis left right
---           | left > right = return Nothing
---           | left == right = do
---               p <- GM.read v left
---               return $ Just $ TreeNode Nothing p Nothing
---           | otherwise = do
---               let l = (right - left) + 1
---                   pivotIx = left + (l `div` 2)
---                   cmp = comparing (_coord s axis . fst)
---               select cmp v left right pivotIx
---               maybeLeft <- go v (incrementAxis s axis) left (pivotIx - 1)
---               maybeRight <- go v (incrementAxis s axis) (pivotIx + 1) right
---               pivotPoint <- GM.read v pivotIx
---               return $ Just $ TreeNode
---                               { treeLeft = maybeLeft
---                               , treePoint = pivotPoint
---                               , treeRight = maybeRight
---                               }
-
--- buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
--- buildKdMap _ [] = error "KdMap must be built with a non-empty list."
--- buildKdMap s ps = KdMap s (buildTreeInternal s ps) $ length ps
-
 quickselect :: (a -> a -> Ordering) -> Int -> [a] -> a
 quickselect cmp = go
   where go _ [] = error "quickselect must be called on a non-empty list."
@@ -196,28 +141,6 @@ nearestNeighbor (KdMap s t@(TreeNode _ root _) _) query =
           then nearestInTree maybeLeft maybeRight
           else nearestInTree maybeRight maybeLeft
 
--- TODO why isn't this faster than the concat-based version?
--- nearNeighbors :: KdMap k v -> Double -> k -> [(k, v)]
--- nearNeighbors (KdMap s t _) radius query = go 0 t []
---   where go axis (TreeNode maybeLeft (p, d) maybeRight) =
---           let xAxisVal     = _coord s axis p
---               queryAxisVal = _coord s axis query
---               nextAxis     = incrementAxis s axis
---               nears = maybe id (go nextAxis)
---               onTheLeft = queryAxisVal <= xAxisVal
---               onsideNear = if onTheLeft
---                            then nears maybeLeft
---                            else nears maybeRight
---               offsideNear = if abs (queryAxisVal - xAxisVal) < radius
---                             then if onTheLeft
---                                  then nears maybeRight
---                                  else nears maybeLeft
---                             else id
---               currentNear = if _distSqr s p query <= radius * radius
---                             then ((p, d) :)
---                             else id
---           in  onsideNear . currentNear . offsideNear
-
 nearNeighbors :: KdMap k v -> Double -> k -> [(k, v)]
 nearNeighbors (KdMap s t _) radius query = go 0 t
   where go axis (TreeNode maybeLeft (p, d) maybeRight) =
@@ -293,35 +216,6 @@ instance Arbitrary Point2d where
 --------------------------------------------------------------------------------
 -- Tests
 --------------------------------------------------------------------------------
-
--- partitionOnMedian :: Ord a => [a] -> ([a], a, [a])
--- partitionOnMedian xs = runST $ do
---   v <- GM.new $ length xs
---   Control.Monad.forM_ (zip [0 ..] xs) $ \(ix, x) -> do GM.write v ix x
---   partitionOnSelect (compare) v (length xs `div` 2) 0 (length xs)
---   vFrozen <- V.freeze v
---   let (left, medAndRight) = V.splitAt ((length xs `div` 2) - 1) vFrozen
---   return (V.toList left, V.head medAndRight, V.toList $ V.tail medAndRight)
-
--- check_partitionLeftRight :: [Double] -> Bool
--- check_partitionLeftRight xs
---   | length xs < 2 = True
--- check_partitionLeftRight xs =
---   let (left, m, right) = partitionOnMedian xs
---   in  L.all (< m) left && L.all (> m) right
-
--- prop_partitionLeftRight :: Property
--- prop_partitionLeftRight = forAll (listOf1 arbitrary) $ check_partitionLeftRight
-
--- check_partitionElements :: [Double] -> Bool
--- check_partitionElements xs
---   | length xs < 2 = True
--- check_partitionElements xs =
---   let (left, m, right) = partitionOnMedian xs
---   in  L.sort (left ++ [m] ++ right) == L.sort xs
-
--- prop_partitionElements :: Property
--- prop_partitionElements = forAll (listOf1 arbitrary) $ check_partitionElements
 
 testElements :: [k] -> [(k, Int)]
 testElements ps = zip ps $ [0 ..]
