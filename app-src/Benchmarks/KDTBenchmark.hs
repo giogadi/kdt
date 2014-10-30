@@ -26,12 +26,11 @@ interleaveBuildQuery =
         let newKdt = Data.Trees.DynamicKdTree.insert kdt treePt ()
             (nearest, _) = Data.Trees.DynamicKdTree.nearestNeighbor newKdt queryPt
         in  (newKdt, nearest : accList)
-      start = (emptyDkdTree mk2DEuclideanSpace, [])
+      start = (emptyDkdTree pointAsList2d distSqr2d, [])
   in  snd . foldl' f start
 
 nearestLinear :: [Point2d] -> Point2d -> Point2d
-nearestLinear ps query = minimumBy (compare `on` (dist query)) ps
-  where dist = _distSqr $ mk2DEuclideanSpace
+nearestLinear ps query = minimumBy (compare `on` distSqr2d query) ps
 
 linearInterleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 linearInterleaveBuildQuery =
@@ -47,7 +46,8 @@ main =
   let seed = 1
       numPoints = 100000
       treePoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT seed
-      kdt5000 = buildKdMap mk2DEuclideanSpace $ zip (take 5000 treePoints) $ repeat ()
+      kdt5000 = buildKdMapWithDistSqrFn pointAsList2d distSqr2d $
+                  zip (take 5000 treePoints) $ repeat ()
       queryPoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT (seed + 1)
   in  defaultMain [
       bgroup "linear" [ bench "build-5000-query-5000" $ nf
@@ -60,7 +60,8 @@ main =
                           (zip (take 10000 treePoints) (take 10000 queryPoints))
                       ],
       bgroup "kdtree" [ bench "build-10000-only" $ nf
-                          (buildKdMap mk2DEuclideanSpace) (zip (take 10000 treePoints) $ repeat ()),
+                          (buildKdMapWithDistSqrFn pointAsList2d distSqr2d)
+                          (zip (take 10000 treePoints) $ repeat ()),
                         bench "build-5000-query-5000" $ nf
                           (map (Data.Trees.KdMap.nearestNeighbor kdt5000))
                           (take 5000 queryPoints),
@@ -72,7 +73,7 @@ main =
                           (take 5000 queryPoints)
                       ],
       bgroup "dkdtree" [ bench "batch-5000" $ nf
-                           (batchInsert $ emptyDkdTree mk2DEuclideanSpace)
+                           (batchInsert $ emptyDkdTree pointAsList2d distSqr2d)
                            (zip (take 5000 treePoints) $ repeat ()),
                          bench "interleave-5000" $ nf
                            interleaveBuildQuery

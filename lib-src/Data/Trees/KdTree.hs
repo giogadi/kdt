@@ -1,7 +1,9 @@
 module Data.Trees.KdTree
-       ( KdSpace (..)
+       ( PointAsListFn
+       , SquaredDistanceFn
        , KdTree
        , buildKdTree
+       , buildKdTreeWithDistSqrFn
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
@@ -12,16 +14,22 @@ module Data.Trees.KdTree
 import Data.Foldable
 
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (KdSpace (..))
+import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
 
 newtype KdTree p = KdTree (KDM.KdMap p ())
 
 instance Foldable KdTree where
   foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
 
-buildKdTree :: KdSpace p -> [p] -> KdTree p
-buildKdTree _ [] = error "KdTree must be build with a non-empty list."
-buildKdTree s ps = KdTree $ KDM.buildKdMap s $ zip ps $ repeat ()
+buildKdTree :: PointAsListFn p -> [p] -> KdTree p
+buildKdTree _ [] = error "KdTree must be built with a non-empty list."
+buildKdTree pointAsList ps =
+  KdTree $ KDM.buildKdMap pointAsList $ zip ps $ repeat ()
+
+buildKdTreeWithDistSqrFn :: PointAsListFn p -> SquaredDistanceFn p -> [p] -> KdTree p
+buildKdTreeWithDistSqrFn _ _ [] = error "KdTree must be built with a non-empty list."
+buildKdTreeWithDistSqrFn pointAsList distSqr ps =
+  KdTree $ KDM.buildKdMapWithDistSqrFn pointAsList distSqr $ zip ps $ repeat ()
 
 nearestNeighbor :: KdTree p -> p -> p
 nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query

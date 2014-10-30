@@ -7,4 +7,4 @@ import System.Exit
 main :: IO ()
 main = do
   success <- liftM2 (&&) KDM.runTests DKDT.runTests
-  when (not success) exitFailure
+  unless success exitFailure

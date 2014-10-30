@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
 module Data.Trees.KdMap
-       ( KdSpace (..)
+       ( PointAsListFn
+       , SquaredDistanceFn
        , KdMap
        , buildKdMap
+       , buildKdMapWithDistSqrFn
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
@@ -12,8 +14,9 @@ module Data.Trees.KdMap
        , keys
        , values
        , foldrKdMap
-       , mk2DEuclideanSpace
        , Point2d (..)
+       , pointAsList2d
+       , distSqr2d
        , runTests
        ) where
 
@@ -28,12 +31,6 @@ import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import Test.QuickCheck
 
-data KdSpace k = KdSpace
-                 { _pointAsList  :: k -> [Double]
-                 , _distSqr :: k -> k -> Double
-                 } deriving Generic
-instance NFData k => NFData (KdSpace k) where rnf = genericRnf
-
 data TreeNode k v = TreeNode { _treeLeft :: Maybe (TreeNode k v)
                              , _treePoint :: (k, v)
                              , _axisValue :: Double
@@ -46,11 +43,19 @@ mapTreeNode :: (v1 -> v2) -> TreeNode k v1 -> TreeNode k v2
 mapTreeNode f (TreeNode maybeLeft (k, v) axisValue maybeRight) =
   TreeNode (fmap (mapTreeNode f) maybeLeft) (k, f v) axisValue (fmap (mapTreeNode f) maybeRight)
 
-data KdMap k v = KdMap (KdSpace k) (TreeNode k v) Int deriving Generic
+type PointAsListFn k = k -> [Double]
+
+type SquaredDistanceFn k = k -> k -> Double
+
+data KdMap k v = KdMap { _pointAsList :: PointAsListFn k
+                       , _distSqr     :: SquaredDistanceFn k
+                       , _rootNode    :: TreeNode k v
+                       , _size        :: Int
+                       } deriving Generic
 instance (NFData k, NFData v) => NFData (KdMap k v) where rnf = genericRnf
 
 instance Functor (KdMap k) where
-  fmap f (KdMap s t n) = KdMap s (mapTreeNode f t) n
+  fmap f kdMap = kdMap { _rootNode = (mapTreeNode f (_rootNode kdMap)) }
 
 foldrTreeNode :: ((k, v) -> a -> a) -> a -> TreeNode k v -> a
 foldrTreeNode f z (TreeNode Nothing p _ Nothing) = f p z
@@ -60,7 +65,7 @@ foldrTreeNode f z (TreeNode (Just l) p _ (Just r)) =
   foldrTreeNode f (f p (foldrTreeNode f z r)) l
 
 foldrKdMap :: ((k, v) -> a -> a) -> a -> KdMap k v -> a
-foldrKdMap f z (KdMap _ t _) = foldrTreeNode f z t
+foldrKdMap f z (KdMap _ _ r _) = foldrTreeNode f z r
 
 instance Foldable (KdMap k) where
   foldr f = foldrKdMap (f . snd)
@@ -74,11 +79,15 @@ quickselect cmp = go
           where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
                 l = length ys
 
-buildKdMap :: KdSpace k -> [(k, v)] -> KdMap k v
-buildKdMap _ [] = error "KdMap must be built with a non-empty list."
-buildKdMap s points =
-  let axisValsPointsPairs = zip (map (cycle . _pointAsList s . fst) points) points
-  in  KdMap s (buildTreeInternal axisValsPointsPairs) $ length points
+buildKdMapWithDistSqrFn :: PointAsListFn k -> SquaredDistanceFn k -> [(k, v)] -> KdMap k v
+buildKdMapWithDistSqrFn _ _ [] = error "KdMap must be built with a non-empty list."
+buildKdMapWithDistSqrFn pointAsList distSqr points =
+  let axisValsPointsPairs = zip (map (cycle . pointAsList . fst) points) points
+  in  KdMap { _pointAsList = pointAsList
+            , _distSqr     = distSqr
+            , _rootNode    = buildTreeInternal axisValsPointsPairs
+            , _size        = length points
+            }
   where buildTreeInternal [(v : _, p)] = TreeNode Nothing p v Nothing
         buildTreeInternal ps =
           let n = length ps
@@ -100,13 +109,21 @@ buildKdMap s points =
               , _treeRight = maybeBuildTree rightPoints
               }
 
+defaultDistSqrFn :: PointAsListFn k -> SquaredDistanceFn k
+defaultDistSqrFn pointAsList k1 k2 =
+  L.sum $ map (^ (2 :: Int)) $ zipWith (-) (pointAsList k1) (pointAsList k2)
+
+buildKdMap :: PointAsListFn k -> [(k, v)] -> KdMap k v
+buildKdMap pointAsList =
+  buildKdMapWithDistSqrFn pointAsList $ defaultDistSqrFn pointAsList
+
 assocsInternal :: TreeNode k v -> [(k, v)]
 assocsInternal t = go t []
   where go (TreeNode l p _ r) =
           maybe id go l . (p :) . maybe id go r
 
 assocs :: KdMap k v -> [(k, v)]
-assocs (KdMap _ t _) = assocsInternal t
+assocs (KdMap _ _ t _) = assocsInternal t
 
 keys :: KdMap k v -> [k]
 keys = map fst . assocs
@@ -115,17 +132,17 @@ values :: KdMap k v -> [v]
 values = map snd . assocs
 
 nearestNeighbor :: KdMap k v -> k -> (k, v)
-nearestNeighbor (KdMap s t@(TreeNode _ root _ _) _) query =
+nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
   -- This is an ugly way to kickstart the function but it's faster
   -- than using a Maybe.
-  fst $ go (root, 1 / 0 :: Double) (cycle $ _pointAsList s query) t
+  fst $ go (root, 1 / 0 :: Double) (cycle $ pointAsList query) t
   where
     go _ [] _ = error "nearestNeighbor.go: no empty lists allowed!"
     go bestSoFar (queryAxisValue : qvs) (TreeNode maybeLeft (curr_p, curr_d) curr_v maybeRight) =
       let better (x1, dist1) (x2, dist2) = if dist1 < dist2
                                            then (x1, dist1)
                                            else (x2, dist2)
-          currDist       = _distSqr s query curr_p
+          currDist       = distSqr query curr_p
           bestAfterCurr = better ((curr_p, curr_d), currDist) bestSoFar
           nearestInTree maybeOnsideTree maybeOffsideTree =
             let bestAfterOnside =
@@ -140,7 +157,7 @@ nearestNeighbor (KdMap s t@(TreeNode _ root _ _) _) query =
           else nearestInTree maybeRight maybeLeft
 
 nearNeighbors :: KdMap k v -> Double -> k -> [(k, v)]
-nearNeighbors (KdMap s t _) radius query = go (cycle $ _pointAsList s query) t
+nearNeighbors (KdMap pointAsList distSqr t _) radius query = go (cycle $ pointAsList query) t
   where
     go [] _ = error "nearNeighbors.go: no empty lists allowed!"
     go (queryAxisValue : qvs) (TreeNode maybeLeft (p, d) xAxisValue maybeRight) =
@@ -154,14 +171,14 @@ nearNeighbors (KdMap s t _) radius query = go (cycle $ _pointAsList s query) t
                              then nears maybeRight
                              else nears maybeLeft
                         else []
-          currentNear = if _distSqr s p query <= radius * radius
+          currentNear = if distSqr p query <= radius * radius
                         then [(p, d)]
                         else []
       in  onsideNear ++ currentNear ++ offsideNear
 
 kNearestNeighbors :: KdMap k v -> Int -> k -> [(k, v)]
-kNearestNeighbors (KdMap s t _) k query =
-  reverse $ map snd $ Q.toList $ go (cycle $ _pointAsList s query) Q.empty t
+kNearestNeighbors (KdMap pointAsList distSqr t _) k query =
+  reverse $ map snd $ Q.toList $ go (cycle $ pointAsList query) Q.empty t
   where
     -- go :: [Double] -> Q.MaxPQueue Double (p, d) -> TreeNode p d -> KQueue p d
     go [] _ _ = error "kNearestNeighbors.go: no empty lists allowed!"
@@ -171,7 +188,7 @@ kNearestNeighbors (KdMap s t _) k query =
             | otherwise = if dist < fst (Q.findMax queue)
                           then Q.deleteMax $ Q.insert dist x queue
                           else queue
-          q' = insertBounded q (_distSqr s p query) (p, d)
+          q' = insertBounded q (distSqr p query) (p, d)
           kNearest queue maybeOnsideTree maybeOffsideTree =
             let queue' = maybe queue (go qvs queue) maybeOnsideTree
                 checkOffsideTree =
@@ -185,24 +202,22 @@ kNearestNeighbors (KdMap s t _) k query =
           else kNearest q' maybeRight maybeLeft
 
 size :: KdMap k v -> Int
-size (KdMap _ _ n) = n
+size (KdMap _ _ _ n) = n
 
 --------------------------------------------------------------------------------
--- Example KdSpace: Point2d
+-- Example: Point2d
 --------------------------------------------------------------------------------
 
 data Point2d = Point2d Double Double deriving (Show, Eq, Ord, Generic)
 instance NFData Point2d where rnf = genericRnf
 
-mk2DEuclideanSpace :: KdSpace Point2d
-mk2DEuclideanSpace = KdSpace
-                     { _pointAsList  = pointAsList
-                     , _distSqr = dist
-                     }
- where pointAsList (Point2d x y) = [x, y]
-       dist (Point2d x1 y1) (Point2d x2 y2) = let dx = x2 - x1
-                                                  dy = y2 - y1
-                                              in  dx*dx + dy*dy
+pointAsList2d :: Point2d -> [Double]
+pointAsList2d (Point2d x y) = [x, y]
+
+distSqr2d :: Point2d -> Point2d -> Double
+distSqr2d (Point2d x1 y1) (Point2d x2 y2) = let dx = x2 - x1
+                                                dy = y2 - y1
+                                            in  dx*dx + dy*dy
 
 instance Arbitrary Point2d where
     arbitrary = do
@@ -215,102 +230,103 @@ instance Arbitrary Point2d where
 --------------------------------------------------------------------------------
 
 testElements :: [k] -> [(k, Int)]
-testElements ps = zip ps $ [0 ..]
+testElements ps = zip ps [0 ..]
 
-isTreeValid :: KdSpace k -> Int -> TreeNode k v -> Bool
-isTreeValid s axis (TreeNode l (p, _) xAxisVal r) =
-  let nodeAxisVal (TreeNode _ (p', _) _ _) = _pointAsList s p' !! axis
-      nextAxis = (axis + 1) `mod` length (_pointAsList s p)
+isTreeValid :: PointAsListFn k -> Int -> TreeNode k v -> Bool
+isTreeValid pointAsList axis (TreeNode l (p, _) xAxisVal r) =
+  let nodeAxisVal (TreeNode _ (p', _) _ _) = pointAsList p' !! axis
+      nextAxis = (axis + 1) `mod` length (pointAsList p)
       -- TODO: Shouldn't it be < and >=?
       leftChildValid = maybe True ((<= xAxisVal) . nodeAxisVal) l
       rightChildValid = maybe True ((> xAxisVal) . nodeAxisVal) r
-      leftSubtreeValid = maybe True (isTreeValid s nextAxis) l
-      rightSubtreeValid = maybe True (isTreeValid s nextAxis) r
+      leftSubtreeValid = maybe True (isTreeValid pointAsList nextAxis) l
+      rightSubtreeValid = maybe True (isTreeValid pointAsList nextAxis) r
   in  leftChildValid && rightChildValid && leftSubtreeValid && rightSubtreeValid
 
-checkValidTree :: KdSpace k -> [k] -> Bool
-checkValidTree s ps =
-  let (KdMap _ t _) = buildKdMap s $ testElements ps
-  in  isTreeValid s 0 t
+checkValidTree :: PointAsListFn k -> [k] -> Bool
+checkValidTree pointAsList ps =
+  let (KdMap _ _ r _) = buildKdMap pointAsList $ testElements ps
+  in  isTreeValid pointAsList 0 r
 
 prop_validTree :: Property
-prop_validTree = forAll (listOf1 arbitrary) $ checkValidTree mk2DEuclideanSpace
+prop_validTree = forAll (listOf1 arbitrary) $ checkValidTree pointAsList2d
 
-checkElements :: (Ord k, Show k) => KdSpace k -> [k] -> Bool
-checkElements s ps =
-  let kdt = buildKdMap s $ testElements ps
+checkElements :: (Ord k, Show k) => PointAsListFn k -> [k] -> Bool
+checkElements pointAsList ps =
+  let kdt = buildKdMap pointAsList $ testElements ps
   in  L.sort (assocs kdt) == L.sort (testElements ps)
 
 prop_sameElements :: Property
-prop_sameElements = forAll (listOf1 arbitrary) $ checkElements mk2DEuclideanSpace
+prop_sameElements = forAll (listOf1 arbitrary) $ checkElements pointAsList2d
 
-checkNumElements :: KdSpace k -> [k] -> Bool
-checkNumElements s ps =
-  let (KdMap _ _ n) = buildKdMap s $ testElements ps
+checkNumElements :: PointAsListFn k -> [k] -> Bool
+checkNumElements pointAsList ps =
+  let (KdMap _ _ _ n) = buildKdMap pointAsList $ testElements ps
   in  n == length ps
 
 prop_validNumElements :: Property
-prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements mk2DEuclideanSpace
+prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements pointAsList2d
 
-nearestNeighborLinear :: KdSpace k -> [(k, v)] -> k -> (k, v)
-nearestNeighborLinear s xs query =
-  L.minimumBy (compare `on` (_distSqr s query . fst)) xs
+nearestNeighborLinear :: PointAsListFn k -> [(k, v)] -> k -> (k, v)
+nearestNeighborLinear pointAsList xs query =
+  L.minimumBy (compare `on` (defaultDistSqrFn pointAsList query . fst)) xs
 
-checkNearestEqualToLinear :: Eq k => KdSpace k -> ([k], k) -> Bool
-checkNearestEqualToLinear s (ps, query) =
-  let kdt = buildKdMap s $ testElements ps
-  in  nearestNeighbor kdt query == nearestNeighborLinear s (testElements ps) query
+checkNearestEqualToLinear :: Eq k => PointAsListFn k -> ([k], k) -> Bool
+checkNearestEqualToLinear pointAsList (ps, query) =
+  let kdt = buildKdMap pointAsList $ testElements ps
+  in  nearestNeighbor kdt query == nearestNeighborLinear pointAsList (testElements ps) query
 
 prop_nearestEqualToLinear :: Point2d -> Property
 prop_nearestEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
-    checkNearestEqualToLinear mk2DEuclideanSpace (xs, query)
+    checkNearestEqualToLinear pointAsList2d (xs, query)
 
-nearNeighborsLinear :: KdSpace k -> [(k, v)] -> k -> Double -> [(k, v)]
-nearNeighborsLinear s xs query radius =
-  filter ((<= radius * radius) . _distSqr s query . fst) xs
+nearNeighborsLinear :: PointAsListFn k -> [(k, v)] -> k -> Double -> [(k, v)]
+nearNeighborsLinear pointAsList xs query radius =
+  filter ((<= radius * radius) . defaultDistSqrFn pointAsList query . fst) xs
 
-checkNearEqualToLinear :: Ord k => KdSpace k -> Double -> ([k], k) -> Bool
-checkNearEqualToLinear s radius (ps, query) =
-  let kdt = buildKdMap s $ testElements ps
+checkNearEqualToLinear :: Ord k => PointAsListFn k -> Double -> ([k], k) -> Bool
+checkNearEqualToLinear pointAsList radius (ps, query) =
+  let kdt = buildKdMap pointAsList $ testElements ps
       kdtNear = nearNeighbors kdt radius query
-      linearNear = nearNeighborsLinear s (testElements ps) query radius
+      linearNear = nearNeighborsLinear pointAsList (testElements ps) query radius
   in  L.sort kdtNear == L.sort linearNear
 
 prop_nearEqualToLinear :: Point2d -> Property
 prop_nearEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (0.0, 1000.0)) $ \radius ->
-    checkNearEqualToLinear mk2DEuclideanSpace radius (xs, query)
+    checkNearEqualToLinear pointAsList2d radius (xs, query)
 
-kNearestNeighborsLinear :: KdSpace k -> [(k, v)] -> k -> Int -> [(k, v)]
-kNearestNeighborsLinear s xs query k =
-  take k $ L.sortBy (compare `on` (_distSqr s query . fst)) xs
+kNearestNeighborsLinear :: PointAsListFn k -> [(k, v)] -> k -> Int -> [(k, v)]
+kNearestNeighborsLinear pointAsList xs query k =
+  take k $ L.sortBy (compare `on` (defaultDistSqrFn pointAsList query . fst)) xs
 
-checkKNearestEqualToLinear :: Ord k => KdSpace k -> Int -> ([k], k) -> Bool
-checkKNearestEqualToLinear s k (xs, query) =
-  let kdt = buildKdMap s $ testElements xs
+checkKNearestEqualToLinear :: Ord k => PointAsListFn k -> Int -> ([k], k) -> Bool
+checkKNearestEqualToLinear pointAsList k (xs, query) =
+  let kdt = buildKdMap pointAsList $ testElements xs
       kdtKNear = kNearestNeighbors kdt k query
-      linearKNear = kNearestNeighborsLinear s (testElements xs) query k
+      linearKNear = kNearestNeighborsLinear pointAsList (testElements xs) query k
   in  kdtKNear == linearKNear
 
 prop_kNearestEqualToLinear :: Point2d -> Property
 prop_kNearestEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (1, length xs)) $ \k ->
-      checkKNearestEqualToLinear mk2DEuclideanSpace k (xs, query)
+      checkKNearestEqualToLinear pointAsList2d k (xs, query)
 
-checkKNearestSorted :: Eq k => KdSpace k -> ([k], k) -> Bool
+checkKNearestSorted :: Eq k => PointAsListFn k -> ([k], k) -> Bool
 checkKNearestSorted _ ([], _) = True
-checkKNearestSorted s (ps, query) =
-  let kdt = buildKdMap s $ testElements ps
-      kNearestDists = map (_distSqr s query . fst) $ kNearestNeighbors kdt (length ps) query
+checkKNearestSorted pointAsList (ps, query) =
+  let kdt = buildKdMap pointAsList $ testElements ps
+      kNearestDists =
+        map (defaultDistSqrFn pointAsList query . fst) $ kNearestNeighbors kdt (length ps) query
   in  kNearestDists == L.sort kNearestDists
 
 prop_kNearestSorted :: Point2d -> Property
 prop_kNearestSorted query =
   forAll (listOf1 arbitrary) $ \xs ->
-    checkKNearestSorted mk2DEuclideanSpace (xs, query)
+    checkKNearestSorted pointAsList2d (xs, query)
 
 -- Run all tests
 return []
