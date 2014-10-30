@@ -5,14 +5,19 @@ module Data.Trees.KdTree
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
-       , toList
+       , points
        , size
        ) where
+
+import Data.Foldable
 
 import qualified Data.Trees.KdMap as KDM
 import Data.Trees.KdMap (KdSpace (..))
 
 newtype KdTree p = KdTree (KDM.KdMap p ())
+
+instance Foldable KdTree where
+  foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
 
 buildKdTree :: KdSpace p -> [p] -> KdTree p
 buildKdTree _ [] = error "KdTree must be build with a non-empty list."
@@ -27,8 +32,8 @@ nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius que
 kNearestNeighbors :: KdTree p -> Int -> p -> [p]
 kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 
-toList :: KdTree p -> [p]
-toList (KdTree t) = KDM.keys t
+points :: KdTree p -> [p]
+points (KdTree t) = KDM.keys t
 
 size :: KdTree p -> Int
 size (KdTree t) = KDM.size t

@@ -11,6 +11,7 @@ module Data.Trees.KdMap
        , assocs
        , keys
        , values
+       , foldrKdMap
        , mk2DEuclideanSpace
        , Point2d (..)
        , runTests
@@ -51,12 +52,18 @@ instance (NFData k, NFData v) => NFData (KdMap k v) where rnf = genericRnf
 instance Functor (KdMap k) where
   fmap f (KdMap s t n) = KdMap s (mapTreeNode f t) n
 
+foldrTreeNode :: ((k, v) -> a -> a) -> a -> TreeNode k v -> a
+foldrTreeNode f z (TreeNode Nothing p _ Nothing) = f p z
+foldrTreeNode f z (TreeNode (Just l) p _ Nothing) = foldrTreeNode f (f p z) l
+foldrTreeNode f z (TreeNode Nothing p _ (Just r)) = f p (foldrTreeNode f z r)
+foldrTreeNode f z (TreeNode (Just l) p _ (Just r)) =
+  foldrTreeNode f (f p (foldrTreeNode f z r)) l
+
+foldrKdMap :: ((k, v) -> a -> a) -> a -> KdMap k v -> a
+foldrKdMap f z (KdMap _ t _) = foldrTreeNode f z t
+
 instance Foldable (KdMap k) where
-  foldr f z (KdMap _ t _) = go f z t
-    where go f' z' (TreeNode Nothing (_, v) _ Nothing) = f' v z'
-          go f' z' (TreeNode (Just l) (_, v) _ Nothing) = go f' (f' v z') l
-          go f' z' (TreeNode Nothing (_, v) _ (Just r)) = f' v (go f' z' r)
-          go f' z' (TreeNode (Just l) (_, v) _ (Just r)) = go f' (f' v (go f' z' r)) l
+  foldr f = foldrKdMap (f . snd)
 
 quickselect :: (a -> a -> Ordering) -> Int -> [a] -> a
 quickselect cmp = go
@@ -179,6 +186,10 @@ kNearestNeighbors (KdMap s t _) k query =
 
 size :: KdMap k v -> Int
 size (KdMap _ _ n) = n
+
+--------------------------------------------------------------------------------
+-- Example KdSpace: Point2d
+--------------------------------------------------------------------------------
 
 data Point2d = Point2d Double Double deriving (Show, Eq, Ord, Generic)
 instance NFData Point2d where rnf = genericRnf
