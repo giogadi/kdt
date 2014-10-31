@@ -1,11 +1,10 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
--- TODO: Implement range find?
-module Data.Trees.DynamicKdTree
-       ( DkdTree
+module Data.Trees.DynamicKdMap
+       ( DkdMap
        , PointAsListFn
        , SquaredDistanceFn
-       , emptyDkdTree
+       , emptyDkdMap
        , singleton
        , nearestNeighbor
        , nearNeighbors
@@ -14,17 +13,22 @@ module Data.Trees.DynamicKdTree
        , insertPair
        , null
        , size
-       , toList
+       , assocs
+       , keys
+       , values
        , batchInsert
        , runTests
        ) where
 
 import Prelude hiding (null)
 
+import Control.Applicative
 import Data.Bits
+import Data.Foldable
 import Data.Function
-import Data.List hiding (insert, null)
+import Data.List as L hiding (insert, null)
 import qualified Data.List (null)
+import Data.Traversable
 
 import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
@@ -34,48 +38,60 @@ import Test.QuickCheck hiding ((.&.))
 import qualified Data.Trees.KdMap as KDM
 import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, pointAsList2d, distSqr2d, Point2d (..))
 
-data DkdTree k v = DkdTree
+data DkdMap k v = DkdMap
                   { _trees       :: [KDM.KdMap k v]
                   , _pointAsList :: PointAsListFn k
                   , _distSqr     :: SquaredDistanceFn k
                   , _numNodes    :: Int
                   } deriving Generic
-instance (NFData k, NFData v) => NFData (DkdTree k v) where rnf = genericRnf
+instance (NFData k, NFData v) => NFData (DkdMap k v) where rnf = genericRnf
 
--- TODO remove this
-emptyDkdTree :: PointAsListFn k -> SquaredDistanceFn k -> DkdTree k v
-emptyDkdTree p2l d2 = DkdTree [] p2l d2 0
+instance Functor (DkdMap k) where
+  fmap f dkdMap = dkdMap { _trees = map (fmap f) $ _trees dkdMap }
 
-null :: DkdTree k v -> Bool
-null (DkdTree [] _ _ _) = True
+foldrDkdMap :: ((k, v) -> a -> a) -> a -> DkdMap k v -> a
+foldrDkdMap f z dkdMap = L.foldr (flip $ KDM.foldrKdMap f) z $ _trees dkdMap
+
+instance Foldable (DkdMap k) where
+  foldr f = foldrDkdMap (f . snd)
+
+instance Traversable (DkdMap k) where
+  traverse f (DkdMap t p d n) =
+    DkdMap <$> traverse (traverse f) t <*> pure p <*> pure d <*> pure n
+
+emptyDkdMap :: PointAsListFn k -> SquaredDistanceFn k -> DkdMap k v
+emptyDkdMap p2l d2 = DkdMap [] p2l d2 0
+
+null :: DkdMap k v -> Bool
+null (DkdMap [] _ _ _) = True
 null _ = False
 
-singleton :: PointAsListFn k -> SquaredDistanceFn k -> (k, v) -> DkdTree k v
+singleton :: PointAsListFn k -> SquaredDistanceFn k -> (k, v) -> DkdMap k v
 singleton p2l d2 (k, v) =
-  DkdTree [KDM.buildKdMapWithDistFn p2l d2 [(k, v)]] p2l d2 1
+  DkdMap [KDM.buildKdMapWithDistFn p2l d2 [(k, v)]] p2l d2 1
 
-nearestNeighbor :: DkdTree k v -> k -> (k, v)
-nearestNeighbor (DkdTree ts _ d2 _) query =
+nearestNeighbor :: DkdMap k v -> k -> (k, v)
+nearestNeighbor (DkdMap ts _ d2 _) query =
   let nearests = map (`KDM.nearestNeighbor` query) ts
   in  if   Data.List.null nearests
-      then error "Called nearestNeighbor on empty DkdTree."
-      else minimumBy (compare `on` (d2 query . fst)) nearests
+      then error "Called nearestNeighbor on empty DkdMap."
+      else L.minimumBy (compare `on` (d2 query . fst)) nearests
 
-insert :: DkdTree k v -> k -> v -> DkdTree k v
-insert (DkdTree trees p2l d2 n) k v =
+insert :: DkdMap k v -> k -> v -> DkdMap k v
+insert (DkdMap trees p2l d2 n) k v =
   let bitList = map ((1 .&.) . (n `shiftR`)) [0..]
       (onesPairs, theRestPairs) = span ((== 1) . fst) $ zip bitList trees
       ((_, ones), (_, theRest)) = (unzip onesPairs, unzip theRestPairs)
-      newTree = KDM.buildKdMapWithDistFn p2l d2  $ (k, v) : concatMap KDM.assocs ones
-  in  DkdTree (newTree : theRest) p2l d2 $ n + 1
+      newTree = KDM.buildKdMapWithDistFn p2l d2  $ (k, v) : L.concatMap KDM.assocs ones
+  in  DkdMap (newTree : theRest) p2l d2 $ n + 1
 
-insertPair :: DkdTree k v -> (k, v) -> DkdTree k v
+insertPair :: DkdMap k v -> (k, v) -> DkdMap k v
 insertPair t = uncurry (insert t)
 
-kNearestNeighbors :: DkdTree k v -> Int -> k -> [(k, v)]
-kNearestNeighbors (DkdTree trees _ d2 _) k query =
+kNearestNeighbors :: DkdMap k v -> Int -> k -> [(k, v)]
+kNearestNeighbors (DkdMap trees _ d2 _) k query =
   let neighborSets = map (\t -> KDM.kNearestNeighbors t k query) trees
-  in  take k $ foldr merge [] neighborSets
+  in  take k $ L.foldr merge [] neighborSets
  where merge [] ys = ys
        merge xs [] = xs
        merge xs@(x:xt) ys@(y:yt)
@@ -84,18 +100,26 @@ kNearestNeighbors (DkdTree trees _ d2 _) k query =
         where distX = d2 query $ fst x
               distY = d2 query $ fst y
 
-nearNeighbors :: DkdTree k v -> Double -> k -> [(k, v)]
-nearNeighbors (DkdTree trees _ _ _) radius query =
-  concatMap (\t -> KDM.nearNeighbors t radius query) trees
+nearNeighbors :: DkdMap k v -> Double -> k -> [(k, v)]
+nearNeighbors (DkdMap trees _ _ _) radius query =
+  L.concatMap (\t -> KDM.nearNeighbors t radius query) trees
 
-size :: DkdTree k v -> Int
-size (DkdTree _ _ _ n) = n
+size :: DkdMap k v -> Int
+size (DkdMap _ _ _ n) = n
 
-toList :: DkdTree k v -> [(k, v)]
-toList (DkdTree trees _ _ _) = concatMap KDM.assocs trees
+assocs :: DkdMap k v -> [(k, v)]
+assocs (DkdMap trees _ _ _) = L.concatMap KDM.assocs trees
 
-batchInsert :: DkdTree k v -> [(k, v)] -> DkdTree k v
-batchInsert =  foldl' insertPair
+keys :: DkdMap k v -> [k]
+keys = map fst . assocs
+
+values :: DkdMap k v -> [v]
+values = map snd . assocs
+
+-- TODO: This can be made far more efficient by batch-creating the
+-- individual KdMaps before placing them into the DkdMap
+batchInsert :: DkdMap k v -> [(k, v)] -> DkdMap k v
+batchInsert =  L.foldl' insertPair
 
 --------------------------------------------------------------------------------
 -- Tests
@@ -106,24 +130,24 @@ testElements ps = zip ps [1 ..]
 
 checkLogNTrees :: PointAsListFn k -> SquaredDistanceFn k -> [k] -> Bool
 checkLogNTrees p2l d2 ps =
-  let lengthIsLogN (DkdTree ts _ _ n) = length ts == popCount n
-  in  all lengthIsLogN $ scanl insertPair (emptyDkdTree p2l d2) $ testElements ps
+  let lengthIsLogN (DkdMap ts _ _ n) = length ts == popCount n
+  in  L.all lengthIsLogN $ scanl insertPair (emptyDkdMap p2l d2) $ testElements ps
 
 prop_logNTrees :: [Point2d] -> Bool
 prop_logNTrees = checkLogNTrees pointAsList2d distSqr2d
 
 checkTreeSizesPowerOf2 :: PointAsListFn k -> SquaredDistanceFn k -> [k] -> Bool
 checkTreeSizesPowerOf2 p2l d2 ps =
-  let sizesPowerOf2 (DkdTree ts _ _ _) = all (== 1) $ map (popCount . length . KDM.assocs) ts
-  in  all sizesPowerOf2 $ scanl insertPair (emptyDkdTree p2l d2) $ testElements ps
+  let sizesPowerOf2 (DkdMap ts _ _ _) = L.all (== 1) $ map (popCount . length . KDM.assocs) ts
+  in  L.all sizesPowerOf2 $ scanl insertPair (emptyDkdMap p2l d2) $ testElements ps
 
 prop_treeSizesPowerOf2 :: [Point2d] -> Bool
 prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 pointAsList2d distSqr2d
 
 checkNumElements :: PointAsListFn k -> SquaredDistanceFn k -> [k] -> Bool
 checkNumElements p2l d2 ps =
-  let numsMatch (num, DkdTree ts _ _ n) = n == num && n == sum (map (length . KDM.assocs) ts)
-  in  all numsMatch $ zip [0..] $ scanl insertPair (emptyDkdTree p2l d2) $ testElements ps
+  let numsMatch (num, DkdMap ts _ _ n) = n == num && n == L.sum (map (length . KDM.assocs) ts)
+  in  L.all numsMatch $ zip [0..] $ scanl insertPair (emptyDkdMap p2l d2) $ testElements ps
 
 prop_validNumElements :: [Point2d] -> Bool
 prop_validNumElements = checkNumElements pointAsList2d distSqr2d
@@ -132,7 +156,7 @@ checkNearestEqualToBatch :: Eq k => PointAsListFn k -> SquaredDistanceFn k -> ([
 checkNearestEqualToBatch p2l d2 (ps, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearestNeighbor kdt query
-      dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDkdMap p2l d2) $ testElements ps
       dkdtAnswer = nearestNeighbor dkdt query
   in  dkdtAnswer == kdtAnswer
 
@@ -145,7 +169,7 @@ checkKNearestEqualToBatch :: Eq k => PointAsListFn k -> SquaredDistanceFn k -> (
 checkKNearestEqualToBatch p2l d2 (ps, k, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.kNearestNeighbors kdt k query
-      dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDkdMap p2l d2) $ testElements ps
       dkdtAnswer = kNearestNeighbors dkdt k query
   in  dkdtAnswer == kdtAnswer
 
@@ -159,7 +183,7 @@ checkNearEqualToBatch :: Ord k => PointAsListFn k -> SquaredDistanceFn k -> ([k]
 checkNearEqualToBatch p2l d2 (ps, radius, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearNeighbors kdt radius query
-      dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDkdMap p2l d2) $ testElements ps
       dkdtAnswer = nearNeighbors dkdt radius query
   in  sort dkdtAnswer == sort kdtAnswer
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
+-- TODO: Implement range find?
 module Data.Trees.KdMap
        ( PointAsListFn
        , SquaredDistanceFn
