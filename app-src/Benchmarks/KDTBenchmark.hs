@@ -46,7 +46,7 @@ main =
   let seed = 1
       numPoints = 100000
       treePoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT seed
-      kdt5000 = buildKdMapWithDistSqrFn pointAsList2d distSqr2d $
+      kdt5000 = buildKdMapWithDistFn pointAsList2d distSqr2d $
                   zip (take 5000 treePoints) $ repeat ()
       queryPoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT (seed + 1)
   in  defaultMain [
@@ -60,7 +60,7 @@ main =
                           (zip (take 10000 treePoints) (take 10000 queryPoints))
                       ],
       bgroup "kdtree" [ bench "build-10000-only" $ nf
-                          (buildKdMapWithDistSqrFn pointAsList2d distSqr2d)
+                          (buildKdMapWithDistFn pointAsList2d distSqr2d)
                           (zip (take 10000 treePoints) $ repeat ()),
                         bench "build-5000-query-5000" $ nf
                           (map (Data.Trees.KdMap.nearestNeighbor kdt5000))

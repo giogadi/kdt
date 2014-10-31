@@ -52,7 +52,7 @@ null _ = False
 
 singleton :: PointAsListFn k -> SquaredDistanceFn k -> (k, v) -> DkdTree k v
 singleton p2l d2 (k, v) =
-  DkdTree [KDM.buildKdMapWithDistSqrFn p2l d2 [(k, v)]] p2l d2 1
+  DkdTree [KDM.buildKdMapWithDistFn p2l d2 [(k, v)]] p2l d2 1
 
 nearestNeighbor :: DkdTree k v -> k -> (k, v)
 nearestNeighbor (DkdTree ts _ d2 _) query =
@@ -66,7 +66,7 @@ insert (DkdTree trees p2l d2 n) k v =
   let bitList = map ((1 .&.) . (n `shiftR`)) [0..]
       (onesPairs, theRestPairs) = span ((== 1) . fst) $ zip bitList trees
       ((_, ones), (_, theRest)) = (unzip onesPairs, unzip theRestPairs)
-      newTree = KDM.buildKdMapWithDistSqrFn p2l d2  $ (k, v) : concatMap KDM.assocs ones
+      newTree = KDM.buildKdMapWithDistFn p2l d2  $ (k, v) : concatMap KDM.assocs ones
   in  DkdTree (newTree : theRest) p2l d2 $ n + 1
 
 insertPair :: DkdTree k v -> (k, v) -> DkdTree k v
@@ -130,7 +130,7 @@ prop_validNumElements = checkNumElements pointAsList2d distSqr2d
 
 checkNearestEqualToBatch :: Eq k => PointAsListFn k -> SquaredDistanceFn k -> ([k], k) -> Bool
 checkNearestEqualToBatch p2l d2 (ps, query) =
-  let kdt = KDM.buildKdMapWithDistSqrFn p2l d2 $ testElements ps
+  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearestNeighbor kdt query
       dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
       dkdtAnswer = nearestNeighbor dkdt query
@@ -143,7 +143,7 @@ prop_nearestEqualToBatch query =
 
 checkKNearestEqualToBatch :: Eq k => PointAsListFn k -> SquaredDistanceFn k -> ([k], Int, k) -> Bool
 checkKNearestEqualToBatch p2l d2 (ps, k, query) =
-  let kdt = KDM.buildKdMapWithDistSqrFn p2l d2 $ testElements ps
+  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.kNearestNeighbors kdt k query
       dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
       dkdtAnswer = kNearestNeighbors dkdt k query
@@ -157,7 +157,7 @@ prop_kNearestEqualToBatch query =
 
 checkNearEqualToBatch :: Ord k => PointAsListFn k -> SquaredDistanceFn k -> ([k], Double, k) -> Bool
 checkNearEqualToBatch p2l d2 (ps, radius, query) =
-  let kdt = KDM.buildKdMapWithDistSqrFn p2l d2 $ testElements ps
+  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearNeighbors kdt radius query
       dkdt = batchInsert (emptyDkdTree p2l d2) $ testElements ps
       dkdtAnswer = nearNeighbors dkdt radius query

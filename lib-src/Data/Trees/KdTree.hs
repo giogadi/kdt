@@ -3,7 +3,7 @@ module Data.Trees.KdTree
        , SquaredDistanceFn
        , KdTree
        , buildKdTree
-       , buildKdTreeWithDistSqrFn
+       , buildKdTreeWithDistFn
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
@@ -26,10 +26,10 @@ buildKdTree _ [] = error "KdTree must be built with a non-empty list."
 buildKdTree pointAsList ps =
   KdTree $ KDM.buildKdMap pointAsList $ zip ps $ repeat ()
 
-buildKdTreeWithDistSqrFn :: PointAsListFn p -> SquaredDistanceFn p -> [p] -> KdTree p
-buildKdTreeWithDistSqrFn _ _ [] = error "KdTree must be built with a non-empty list."
-buildKdTreeWithDistSqrFn pointAsList distSqr ps =
-  KdTree $ KDM.buildKdMapWithDistSqrFn pointAsList distSqr $ zip ps $ repeat ()
+buildKdTreeWithDistFn :: PointAsListFn p -> SquaredDistanceFn p -> [p] -> KdTree p
+buildKdTreeWithDistFn _ _ [] = error "KdTree must be built with a non-empty list."
+buildKdTreeWithDistFn pointAsList distSqr ps =
+  KdTree $ KDM.buildKdMapWithDistFn pointAsList distSqr $ zip ps $ repeat ()
 
 nearestNeighbor :: KdTree p -> p -> p
 nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query

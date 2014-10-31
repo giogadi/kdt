@@ -5,7 +5,7 @@ module Data.Trees.KdMap
        , SquaredDistanceFn
        , KdMap
        , buildKdMap
-       , buildKdMapWithDistSqrFn
+       , buildKdMapWithDistFn
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
@@ -31,17 +31,19 @@ import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import Test.QuickCheck
 
-data TreeNode k v = TreeNode { _treeLeft :: Maybe (TreeNode k v)
+data TreeNode k v = TreeNode { _treeLeft :: TreeNode k v
                              , _treePoint :: (k, v)
                              , _axisValue :: Double
-                             , _treeRight :: Maybe (TreeNode k v)
-                             }
-                             deriving Generic
+                             , _treeRight :: TreeNode k v
+                             } |
+                    Empty
+  deriving Generic
 instance (NFData k, NFData v) => NFData (TreeNode k v) where rnf = genericRnf
 
 mapTreeNode :: (v1 -> v2) -> TreeNode k v1 -> TreeNode k v2
-mapTreeNode f (TreeNode maybeLeft (k, v) axisValue maybeRight) =
-  TreeNode (fmap (mapTreeNode f) maybeLeft) (k, f v) axisValue (fmap (mapTreeNode f) maybeRight)
+mapTreeNode _ Empty = Empty
+mapTreeNode f (TreeNode left (k, v) axisValue right) =
+  TreeNode (mapTreeNode f left) (k, f v) axisValue (mapTreeNode f right)
 
 type PointAsListFn k = k -> [Double]
 
@@ -58,11 +60,9 @@ instance Functor (KdMap k) where
   fmap f kdMap = kdMap { _rootNode = (mapTreeNode f (_rootNode kdMap)) }
 
 foldrTreeNode :: ((k, v) -> a -> a) -> a -> TreeNode k v -> a
-foldrTreeNode f z (TreeNode Nothing p _ Nothing) = f p z
-foldrTreeNode f z (TreeNode (Just l) p _ Nothing) = foldrTreeNode f (f p z) l
-foldrTreeNode f z (TreeNode Nothing p _ (Just r)) = f p (foldrTreeNode f z r)
-foldrTreeNode f z (TreeNode (Just l) p _ (Just r)) =
-  foldrTreeNode f (f p (foldrTreeNode f z r)) l
+foldrTreeNode _ z Empty = z
+foldrTreeNode f z (TreeNode left p _ right) =
+  foldrTreeNode f (f p (foldrTreeNode f z right)) left
 
 foldrKdMap :: ((k, v) -> a -> a) -> a -> KdMap k v -> a
 foldrKdMap f z (KdMap _ _ r _) = foldrTreeNode f z r
@@ -79,16 +79,16 @@ quickselect cmp = go
           where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
                 l = length ys
 
-buildKdMapWithDistSqrFn :: PointAsListFn k -> SquaredDistanceFn k -> [(k, v)] -> KdMap k v
-buildKdMapWithDistSqrFn _ _ [] = error "KdMap must be built with a non-empty list."
-buildKdMapWithDistSqrFn pointAsList distSqr points =
+buildKdMapWithDistFn :: PointAsListFn k -> SquaredDistanceFn k -> [(k, v)] -> KdMap k v
+buildKdMapWithDistFn _ _ [] = error "KdMap must be built with a non-empty list."
+buildKdMapWithDistFn pointAsList distSqr points =
   let axisValsPointsPairs = zip (map (cycle . pointAsList . fst) points) points
   in  KdMap { _pointAsList = pointAsList
             , _distSqr     = distSqr
             , _rootNode    = buildTreeInternal axisValsPointsPairs
             , _size        = length points
             }
-  where buildTreeInternal [(v : _, p)] = TreeNode Nothing p v Nothing
+  where buildTreeInternal [] = Empty
         buildTreeInternal ps =
           let n = length ps
               (medianAxisVal : _, medianPt) =
@@ -100,13 +100,11 @@ buildKdMapWithDistSqrFn pointAsList distSqr points =
                                      | v > medianAxisVal = (lt, (vt, p) : gt)
                                      | otherwise = (lt, gt)
               (leftPoints, rightPoints) = L.foldr f ([], []) ps
-              maybeBuildTree [] = Nothing
-              maybeBuildTree ps' = Just $ buildTreeInternal ps'
           in  TreeNode
-              { _treeLeft  = maybeBuildTree leftPoints
+              { _treeLeft  = buildTreeInternal leftPoints
               , _treePoint = medianPt
               , _axisValue = medianAxisVal
-              , _treeRight = maybeBuildTree rightPoints
+              , _treeRight = buildTreeInternal rightPoints
               }
 
 defaultDistSqrFn :: PointAsListFn k -> SquaredDistanceFn k
@@ -115,12 +113,12 @@ defaultDistSqrFn pointAsList k1 k2 =
 
 buildKdMap :: PointAsListFn k -> [(k, v)] -> KdMap k v
 buildKdMap pointAsList =
-  buildKdMapWithDistSqrFn pointAsList $ defaultDistSqrFn pointAsList
+  buildKdMapWithDistFn pointAsList $ defaultDistSqrFn pointAsList
 
 assocsInternal :: TreeNode k v -> [(k, v)]
 assocsInternal t = go t []
-  where go (TreeNode l p _ r) =
-          maybe id go l . (p :) . maybe id go r
+  where go Empty = id
+        go (TreeNode l p _ r) = go l . (p :) . go r
 
 assocs :: KdMap k v -> [(k, v)]
 assocs (KdMap _ _ t _) = assocsInternal t
@@ -132,74 +130,80 @@ values :: KdMap k v -> [v]
 values = map snd . assocs
 
 nearestNeighbor :: KdMap k v -> k -> (k, v)
+nearestNeighbor (KdMap _ _ Empty _) _ =
+  error "nearestNeighbor: why is there an empty KdMap?"
 nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
   -- This is an ugly way to kickstart the function but it's faster
   -- than using a Maybe.
   fst $ go (root, 1 / 0 :: Double) (cycle $ pointAsList query) t
   where
     go _ [] _ = error "nearestNeighbor.go: no empty lists allowed!"
-    go bestSoFar (queryAxisValue : qvs) (TreeNode maybeLeft (curr_p, curr_d) curr_v maybeRight) =
-      let better (x1, dist1) (x2, dist2) = if dist1 < dist2
-                                           then (x1, dist1)
-                                           else (x2, dist2)
-          currDist       = distSqr query curr_p
-          bestAfterCurr = better ((curr_p, curr_d), currDist) bestSoFar
-          nearestInTree maybeOnsideTree maybeOffsideTree =
-            let bestAfterOnside =
-                  maybe bestAfterCurr (go bestAfterCurr qvs) maybeOnsideTree
-                checkOffsideTree =
-                  (queryAxisValue - curr_v)^(2 :: Int) < snd bestAfterOnside
-            in  if checkOffsideTree
-                then maybe bestAfterOnside (go bestAfterOnside qvs) maybeOffsideTree
+    go bestSoFar _ Empty = bestSoFar
+    go bestSoFar
+       (queryAxisValue : qvs)
+       (TreeNode left (nodeK, nodeV) nodeAxisVal right) =
+      let better x1@(_, dist1) x2@(_, dist2) = if dist1 < dist2
+                                               then x1
+                                               else x2
+          currDist       = distSqr query nodeK
+          bestAfterNode = better ((nodeK, nodeV), currDist) bestSoFar
+          nearestInTree onsideSubtree offsideSubtree =
+            let bestAfterOnside = go bestAfterNode qvs onsideSubtree
+                checkOffsideSubtree =
+                  (queryAxisValue - nodeAxisVal)^(2 :: Int) < snd bestAfterOnside
+            in  if checkOffsideSubtree
+                then go bestAfterOnside qvs offsideSubtree
                 else bestAfterOnside
-      in  if queryAxisValue <= curr_v
-          then nearestInTree maybeLeft maybeRight
-          else nearestInTree maybeRight maybeLeft
+      in  if queryAxisValue <= nodeAxisVal
+          then nearestInTree left right
+          else nearestInTree right left
 
 nearNeighbors :: KdMap k v -> Double -> k -> [(k, v)]
-nearNeighbors (KdMap pointAsList distSqr t _) radius query = go (cycle $ pointAsList query) t
+nearNeighbors (KdMap pointAsList distSqr t _) radius query =
+  go (cycle $ pointAsList query) t
   where
     go [] _ = error "nearNeighbors.go: no empty lists allowed!"
-    go (queryAxisValue : qvs) (TreeNode maybeLeft (p, d) xAxisValue maybeRight) =
-      let nears = maybe [] (go qvs)
-          onTheLeft = queryAxisValue <= xAxisValue
-          onsideNear = if onTheLeft
-                       then nears maybeLeft
-                       else nears maybeRight
-          offsideNear = if abs (queryAxisValue - xAxisValue) < radius
-                        then if onTheLeft
-                             then nears maybeRight
-                             else nears maybeLeft
+    go _ Empty = []
+    go (queryAxisValue : qvs) (TreeNode left (k, v) nodeAxisVal right) =
+      let onTheLeft = queryAxisValue <= nodeAxisVal
+          onsideNear = if   onTheLeft
+                       then go qvs left
+                       else go qvs right
+          offsideNear = if   abs (queryAxisValue - nodeAxisVal) < radius
+                        then if   onTheLeft
+                             then go qvs right
+                             else go qvs left
                         else []
-          currentNear = if distSqr p query <= radius * radius
-                        then [(p, d)]
+          currentNear = if distSqr k query <= radius * radius
+                        then [(k, v)]
                         else []
       in  onsideNear ++ currentNear ++ offsideNear
 
 kNearestNeighbors :: KdMap k v -> Int -> k -> [(k, v)]
-kNearestNeighbors (KdMap pointAsList distSqr t _) k query =
+kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
   reverse $ map snd $ Q.toList $ go (cycle $ pointAsList query) Q.empty t
   where
     -- go :: [Double] -> Q.MaxPQueue Double (p, d) -> TreeNode p d -> KQueue p d
     go [] _ _ = error "kNearestNeighbors.go: no empty lists allowed!"
-    go (queryAxisValue : qvs) q (TreeNode maybeLeft (p, d) xAxisValue maybeRight) =
+    go _ q Empty = q
+    go (queryAxisValue : qvs) q (TreeNode left (k, v) nodeAxisVal right) =
       let insertBounded queue dist x
-            | Q.size queue < k = Q.insert dist x queue
+            | Q.size queue < numNeighbors = Q.insert dist x queue
             | otherwise = if dist < fst (Q.findMax queue)
                           then Q.deleteMax $ Q.insert dist x queue
                           else queue
-          q' = insertBounded q (distSqr p query) (p, d)
-          kNearest queue maybeOnsideTree maybeOffsideTree =
-            let queue' = maybe queue (go qvs queue) maybeOnsideTree
+          q' = insertBounded q (distSqr k query) (k, v)
+          kNearest queue onsideSubtree offsideSubtree =
+            let queue' = go qvs queue onsideSubtree
                 checkOffsideTree =
-                  Q.size queue' < k ||
-                  (queryAxisValue - xAxisValue)^(2 :: Int) < fst (Q.findMax queue')
+                  Q.size queue' < numNeighbors ||
+                  (queryAxisValue - nodeAxisVal)^(2 :: Int) < fst (Q.findMax queue')
             in  if checkOffsideTree
-                then maybe queue' (go qvs queue') maybeOffsideTree
+                then go qvs queue' offsideSubtree
                 else queue'
-      in  if queryAxisValue <= xAxisValue
-          then kNearest q' maybeLeft maybeRight
-          else kNearest q' maybeRight maybeLeft
+      in  if queryAxisValue <= nodeAxisVal
+          then kNearest q' left right
+          else kNearest q' right left
 
 size :: KdMap k v -> Int
 size (KdMap _ _ _ n) = n
@@ -233,15 +237,14 @@ testElements :: [k] -> [(k, Int)]
 testElements ps = zip ps [0 ..]
 
 isTreeValid :: PointAsListFn k -> Int -> TreeNode k v -> Bool
-isTreeValid pointAsList axis (TreeNode l (p, _) xAxisVal r) =
-  let nodeAxisVal (TreeNode _ (p', _) _ _) = pointAsList p' !! axis
-      nextAxis = (axis + 1) `mod` length (pointAsList p)
-      -- TODO: Shouldn't it be < and >=?
-      leftChildValid = maybe True ((<= xAxisVal) . nodeAxisVal) l
-      rightChildValid = maybe True ((> xAxisVal) . nodeAxisVal) r
-      leftSubtreeValid = maybe True (isTreeValid pointAsList nextAxis) l
-      rightSubtreeValid = maybe True (isTreeValid pointAsList nextAxis) r
-  in  leftChildValid && rightChildValid && leftSubtreeValid && rightSubtreeValid
+isTreeValid _ _ Empty = True
+isTreeValid pointAsList axis (TreeNode l (k, _) nodeAxisVal r) =
+  let childrenAxisValues = map ((!! axis) . pointAsList . fst) . assocsInternal
+      leftSubtreeLess = L.all (<= nodeAxisVal) $ childrenAxisValues l
+      rightSubtreeGreater = L.all (> nodeAxisVal) $ childrenAxisValues r
+      nextAxis = (axis + 1) `mod` length (pointAsList k)
+  in  leftSubtreeLess && rightSubtreeGreater &&
+      isTreeValid pointAsList nextAxis l && isTreeValid pointAsList nextAxis r
 
 checkValidTree :: PointAsListFn k -> [k] -> Bool
 checkValidTree pointAsList ps =
