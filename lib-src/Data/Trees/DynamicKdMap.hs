@@ -17,6 +17,7 @@ module Data.Trees.DynamicKdMap
        , keys
        , values
        , batchInsert
+       , foldrDkdMap
        , runTests
        ) where
 

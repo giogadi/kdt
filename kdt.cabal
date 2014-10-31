@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Data.Trees.KdTree,
+                       Data.Trees.DynamicKdTree,
                        Data.Trees.KdMap,
                        Data.Trees.DynamicKdMap
   other-extensions:    DeriveGeneric, TemplateHaskell
