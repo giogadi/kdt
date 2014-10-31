@@ -24,11 +24,13 @@ import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
+import Control.Applicative
 import Data.Foldable
 import Data.Function
 import qualified Data.List as L
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
+import Data.Traversable
 import Test.QuickCheck
 
 data TreeNode k v = TreeNode { _treeLeft :: TreeNode k v
@@ -69,6 +71,19 @@ foldrKdMap f z (KdMap _ _ r _) = foldrTreeNode f z r
 
 instance Foldable (KdMap k) where
   foldr f = foldrKdMap (f . snd)
+
+traverseTreeNode :: Applicative f => (a -> f b) -> TreeNode k a -> f (TreeNode k b)
+traverseTreeNode _ Empty = pure Empty
+traverseTreeNode f (TreeNode l p axisValue r) =
+  TreeNode <$>
+    traverseTreeNode f l <*>
+    traverse f p <*>
+    pure axisValue <*>
+    traverseTreeNode f r
+
+instance Traversable (KdMap k) where
+  traverse f (KdMap p d r n) =
+    KdMap <$> pure p <*> pure d <*> traverseTreeNode f r <*> pure n
 
 quickselect :: (a -> a -> Ordering) -> Int -> [a] -> a
 quickselect cmp = go
