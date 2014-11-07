@@ -29,6 +29,7 @@ import Control.Applicative
 import Data.Foldable
 import Data.Function
 import qualified Data.List as L
+import Data.Maybe
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import Data.Traversable
@@ -107,18 +108,20 @@ buildKdMapWithDistFn pointAsList distSqr points =
   where buildTreeInternal [] = Empty
         buildTreeInternal ps =
           let n = length ps
-              (medianAxisVal : _, medianPt) =
+              (medianAxisVal : _, _) =
                 quickselect (comparing (head . fst)) (n `div` 2) ps
               f ([], _) _ = error "buildKdMap.f: no empty lists allowed!"
-              -- TODO: Doesn't this mess up if more than one point has
-              -- the same axis value?
-              f (v : vt, p) (lt, gt) | v < medianAxisVal = ((vt, p) : lt, gt)
-                                     | v > medianAxisVal = (lt, (vt, p) : gt)
-                                     | otherwise = (lt, gt)
-              (leftPoints, rightPoints) = L.foldr f ([], []) ps
+              f (v : vt, p) (lt, maybeMedian, gt)
+                | v < medianAxisVal = ((vt, p) : lt, maybeMedian, gt)
+                | v > medianAxisVal = (lt, maybeMedian, (vt, p) : gt)
+                | otherwise =
+                    case maybeMedian of
+                      Nothing -> (lt, Just p, gt)
+                      Just _ -> ((vt, p) : lt, maybeMedian, gt)
+              (leftPoints, maybeMedianPt, rightPoints) = L.foldr f ([], Nothing, []) ps
           in  TreeNode
               { _treeLeft  = buildTreeInternal leftPoints
-              , _treePoint = medianPt
+              , _treePoint = fromJust maybeMedianPt
               , _axisValue = medianAxisVal
               , _treeRight = buildTreeInternal rightPoints
               }
@@ -270,7 +273,7 @@ checkValidTree pointAsList ps =
 prop_validTree :: Property
 prop_validTree = forAll (listOf1 arbitrary) $ checkValidTree pointAsList2d
 
-checkElements :: (Ord k, Show k) => PointAsListFn k -> [k] -> Bool
+checkElements :: (Ord k) => PointAsListFn k -> [k] -> Bool
 checkElements pointAsList ps =
   let kdt = buildKdMap pointAsList $ testElements ps
   in  L.sort (assocs kdt) == L.sort (testElements ps)
@@ -346,6 +349,16 @@ prop_kNearestSorted :: Point2d -> Property
 prop_kNearestSorted query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkKNearestSorted pointAsList2d (xs, query)
+
+prop_equalAxisValueSameElems :: Property
+prop_equalAxisValueSameElems =
+  forAll (listOf1 arbitrary) $ \xs@((Point2d x y) : _) ->
+    checkElements pointAsList2d $ (Point2d x (y + 1)) : xs
+
+prop_equalAxisValueEqualToLinear :: Point2d -> Property
+prop_equalAxisValueEqualToLinear query =
+  forAll (listOf1 arbitrary) $ \xs@((Point2d x y) : _) ->
+    checkNearestEqualToLinear pointAsList2d (((Point2d x (y + 1)) : xs), query)
 
 -- Run all tests
 return []
