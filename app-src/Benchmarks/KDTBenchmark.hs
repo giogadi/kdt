@@ -19,9 +19,9 @@ zeroOnePointSampler =
 -- for nearest neighbor
 interleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 interleaveBuildQuery =
-  let f :: (DkdMap Point2d (), [Point2d]) ->
+  let f :: (DkdMap Double Point2d (), [Point2d]) ->
            (Point2d, Point2d) ->
-           (DkdMap Point2d (), [Point2d])
+           (DkdMap Double Point2d (), [Point2d])
       f (kdt, accList) (treePt, queryPt) =
         let newKdt = Data.Trees.DynamicKdMap.insert kdt treePt ()
             (nearest, _) = Data.Trees.DynamicKdMap.nearestNeighbor newKdt queryPt

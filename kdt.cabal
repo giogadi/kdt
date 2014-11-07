@@ -16,10 +16,10 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Data.Trees.KdTree,
-                       Data.Trees.DynamicKdTree,
-                       Data.Trees.KdMap,
-                       Data.Trees.DynamicKdMap
+  exposed-modules:     Data.Trees.KdMap,
+                       Data.Trees.KdTree,
+                       Data.Trees.DynamicKdMap,
+                       Data.Trees.DynamicKdTree
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
   ghc-prof-options:    -Wall -O3 -fprof-auto

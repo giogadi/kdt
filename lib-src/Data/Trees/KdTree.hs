@@ -16,32 +16,36 @@ import Data.Foldable
 import qualified Data.Trees.KdMap as KDM
 import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
 
-newtype KdTree p = KdTree (KDM.KdMap p ())
+newtype KdTree a p = KdTree (KDM.KdMap a p ())
 
-instance Foldable KdTree where
+instance Foldable (KdTree a) where
   foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
 
-buildKdTree :: PointAsListFn p -> [p] -> KdTree p
+buildKdTree :: Real a => PointAsListFn a p -> [p] -> KdTree a p
 buildKdTree _ [] = error "KdTree must be built with a non-empty list."
 buildKdTree pointAsList ps =
   KdTree $ KDM.buildKdMap pointAsList $ zip ps $ repeat ()
 
-buildKdTreeWithDistFn :: PointAsListFn p -> SquaredDistanceFn p -> [p] -> KdTree p
+buildKdTreeWithDistFn :: Real a =>
+                         PointAsListFn a p ->
+                         SquaredDistanceFn a p ->
+                         [p] ->
+                         KdTree a p
 buildKdTreeWithDistFn _ _ [] = error "KdTree must be built with a non-empty list."
 buildKdTreeWithDistFn pointAsList distSqr ps =
   KdTree $ KDM.buildKdMapWithDistFn pointAsList distSqr $ zip ps $ repeat ()
 
-nearestNeighbor :: KdTree p -> p -> p
+nearestNeighbor :: Real a => KdTree a p -> p -> p
 nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
 
-nearNeighbors :: KdTree p -> Double -> p -> [p]
+nearNeighbors :: Real a => KdTree a p -> a -> p -> [p]
 nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius query
 
-kNearestNeighbors :: KdTree p -> Int -> p -> [p]
+kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
 kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 
-points :: KdTree p -> [p]
+points :: KdTree a p -> [p]
 points (KdTree t) = KDM.keys t
 
-size :: KdTree p -> Int
+size :: KdTree a p -> Int
 size (KdTree t) = KDM.size t
