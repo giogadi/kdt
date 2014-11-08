@@ -235,7 +235,7 @@ nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius que
 kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
 kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 
--- | Returns a list of all the points in a 'KdTree'.
+-- | Returns a list of all the points in the 'KdTree'.
 --
 -- Time complexity: /O(n)/ for /n/ data points.
 points :: KdTree a p -> [p]

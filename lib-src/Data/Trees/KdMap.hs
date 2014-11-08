@@ -6,6 +6,8 @@ module Data.Trees.KdMap
 
          -- $usage
 
+         -- * Reference
+
          PointAsListFn
        , KdMap
        , buildKdMap
@@ -89,7 +91,7 @@ type PointAsListFn a k = k -> [a]
 -- @k@ with axis values of type @a@.
 type SquaredDistanceFn a k = k -> k -> a
 
--- | A /k/-d tree structure that stores points of type @p@ with axis
+-- | A /k/-d tree structure that stores points of type @k@ with axis
 -- values of type @a@. Additionally, each point is associated with a
 -- value of type @v@.
 data KdMap a k v = KdMap { _pointAsList :: PointAsListFn a k
