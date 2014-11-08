@@ -48,9 +48,6 @@ module Data.Trees.KdTree
        , kNearestNeighbors
        , points
        , size
-       , Point2d (..)
-       , pointAsList2d
-       , distSqr2d
        ) where
 
 import Control.DeepSeq
@@ -60,11 +57,7 @@ import GHC.Generics
 import Data.Foldable
 
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn,
-                         SquaredDistanceFn,
-                         Point2d (..),
-                         pointAsList2d,
-                         distSqr2d)
+import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
 
 -- $intro
 --

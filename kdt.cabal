@@ -20,6 +20,7 @@ library
                        Data.Trees.KdTree,
                        Data.Trees.DynamicKdMap,
                        Data.Trees.DynamicKdTree
+  other-modules:       Data.Point2d
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
   ghc-prof-options:    -Wall -O3 -fprof-auto

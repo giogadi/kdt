@@ -36,8 +36,9 @@ import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
 
+import Data.Point2d
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, pointAsList2d, distSqr2d, Point2d (..))
+import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
 
 data DkdMap a k v = DkdMap
                     { _trees       :: [KDM.KdMap a k v]
@@ -183,7 +184,7 @@ checkKNearestEqualToBatch p2l d2 (ps, k, query) =
       dkdtAnswer = kNearestNeighbors dkdt k query
   in  dkdtAnswer == kdtAnswer
 
-prop_kNearestEqualToBatch :: KDM.Point2d -> Property
+prop_kNearestEqualToBatch :: Point2d -> Property
 prop_kNearestEqualToBatch query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (1, length xs)) $ \k ->

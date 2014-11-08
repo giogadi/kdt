@@ -1,3 +1,4 @@
+import Data.Point2d
 import Data.Trees.KdMap
 import Data.Trees.DynamicKdMap
 

@@ -16,9 +16,6 @@ module Data.Trees.KdMap
        , keys
        , values
        , foldrKdMap
-       , Point2d (..)
-       , pointAsList2d
-       , distSqr2d
        , runTests
        ) where
 
@@ -35,6 +32,8 @@ import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import Data.Traversable
 import Test.QuickCheck
+
+import Data.Point2d
 
 data TreeNode a k v = TreeNode { _treeLeft :: TreeNode a k v
                                , _treePoint :: (k, v)
@@ -230,27 +229,6 @@ kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
 
 size :: KdMap a k v -> Int
 size (KdMap _ _ _ n) = n
-
---------------------------------------------------------------------------------
--- Example: Point2d
---------------------------------------------------------------------------------
-
-data Point2d = Point2d Double Double deriving (Show, Eq, Ord, Generic)
-instance NFData Point2d where rnf = genericRnf
-
-pointAsList2d :: Point2d -> [Double]
-pointAsList2d (Point2d x y) = [x, y]
-
-distSqr2d :: Point2d -> Point2d -> Double
-distSqr2d (Point2d x1 y1) (Point2d x2 y2) = let dx = x2 - x1
-                                                dy = y2 - y1
-                                            in  dx*dx + dy*dy
-
-instance Arbitrary Point2d where
-    arbitrary = do
-        x <- arbitrary
-        y <- arbitrary
-        return (Point2d x y)
 
 --------------------------------------------------------------------------------
 -- Tests
