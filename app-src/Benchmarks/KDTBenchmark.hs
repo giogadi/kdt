@@ -1,6 +1,6 @@
 import Data.Point2d
-import Data.KdMap
-import Data.Dynamic.KdMap
+import Data.KdMap.Static as KDM
+import Data.KdMap.Dynamic as DKDM
 
 import Control.Monad
 import qualified Control.Monad.Random as CMR
@@ -20,14 +20,14 @@ zeroOnePointSampler =
 -- for nearest neighbor
 interleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 interleaveBuildQuery =
-  let f :: (DynKdMap Double Point2d (), [Point2d]) ->
+  let f :: (DKDM.KdMap Double Point2d (), [Point2d]) ->
            (Point2d, Point2d) ->
-           (DynKdMap Double Point2d (), [Point2d])
+           (DKDM.KdMap Double Point2d (), [Point2d])
       f (kdt, accList) (treePt, queryPt) =
-        let newKdt = Data.Dynamic.KdMap.insert kdt treePt ()
-            (nearest, _) = Data.Dynamic.KdMap.nearestNeighbor newKdt queryPt
+        let newKdt = DKDM.insert kdt treePt ()
+            (nearest, _) = DKDM.nearestNeighbor newKdt queryPt
         in  (newKdt, nearest : accList)
-      start = (emptyDynKdMapWithDistFn pointAsList2d distSqr2d, [])
+      start = (DKDM.emptyKdMapWithDistFn pointAsList2d distSqr2d, [])
   in  snd . foldl' f start
 
 nearestLinear :: [Point2d] -> Point2d -> Point2d
@@ -47,7 +47,7 @@ main =
   let seed = 1
       numPoints = 100000
       treePoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT seed
-      kdt5000 = buildKdMapWithDistFn pointAsList2d distSqr2d $
+      kdt5000 = KDM.buildKdMapWithDistFn pointAsList2d distSqr2d $
                   zip (take 5000 treePoints) $ repeat ()
       queryPoints = CMR.evalRand (replicateM numPoints zeroOnePointSampler) $ pureMT (seed + 1)
   in  defaultMain [
@@ -61,20 +61,20 @@ main =
                           (zip (take 10000 treePoints) (take 10000 queryPoints))
                       ],
       bgroup "kdtree" [ bench "build-10000-only" $ nf
-                          (buildKdMapWithDistFn pointAsList2d distSqr2d)
+                          (KDM.buildKdMapWithDistFn pointAsList2d distSqr2d)
                           (zip (take 10000 treePoints) $ repeat ()),
                         bench "build-5000-query-5000" $ nf
-                          (map (Data.KdMap.nearestNeighbor kdt5000))
+                          (map (KDM.nearestNeighbor kdt5000))
                           (take 5000 queryPoints),
                         bench "build-5000-near-5000-r-0.1" $ nf
-                          (map (Data.KdMap.nearNeighbors kdt5000 0.1))
+                          (map (KDM.nearNeighbors kdt5000 0.1))
                           (take 5000 queryPoints),
                         bench "build-5000-k-near-5000-k-10" $ nf
-                          (map (Data.KdMap.kNearestNeighbors kdt5000 10))
+                          (map (KDM.kNearestNeighbors kdt5000 10))
                           (take 5000 queryPoints)
                       ],
       bgroup "dkdtree" [ bench "batch-5000" $ nf
-                           (batchInsert $ emptyDynKdMapWithDistFn pointAsList2d distSqr2d)
+                           (batchInsert $ DKDM.emptyKdMapWithDistFn pointAsList2d distSqr2d)
                            (zip (take 5000 treePoints) $ repeat ()),
                          bench "interleave-5000" $ nf
                            interleaveBuildQuery

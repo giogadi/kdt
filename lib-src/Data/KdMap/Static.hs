@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
 -- TODO: Implement range find?
-module Data.KdMap
+module Data.KdMap.Static
        ( -- * Usage
 
          -- $usage
@@ -48,18 +48,18 @@ import Data.Point2d
 
 -- $usage
 --
--- The 'KdMap' is a variant of 'Data.KdTree' where each point in
+-- The 'KdMap' is a variant of 'Data.KdTree.Static.KdTree' where each point in
 -- the tree is associated with some data. When talking about 'KdMap's,
 -- we'll refer to the points and their associated data as the /points/
 -- and /values/ of the 'KdMap', respectively. It might help to think
--- of 'Data.KdTree' and 'KdMap' as being analogous to
+-- of 'Data.KdTree.Static.KdTree' and 'KdMap' as being analogous to
 -- 'Data.Set' and 'Data.Map'.
 --
 -- Suppose you wanted to perform point queries on a set of 3D points,
 -- where each point is associated with a 'String'. Here's how to build
 -- a 'KdMap' of the data and perform a nearest neighbor query (if this
 -- doesn't make sense, start with the documentation for
--- 'Data.KdTree'):
+-- 'Data.KdTree.Static.KdTree'):
 --
 -- @
 -- >>> let points = [(Point3d 0.0 0.0 0.0), (Point3d 1.0 1.0 1.0)]

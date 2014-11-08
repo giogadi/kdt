@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Data.KdTree
+module Data.KdTree.Static
        ( -- * Introduction
 
          -- $intro
@@ -54,8 +54,8 @@ import GHC.Generics
 
 import Data.Foldable
 
-import qualified Data.KdMap as KDM
-import Data.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
+import qualified Data.KdMap.Static as KDM
+import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 
 -- $intro
 --
@@ -111,16 +111,17 @@ import Data.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 --
 -- The 'KdTree' structure is meant for static sets of data points. If
 -- you need to insert points into an existing /k/-d tree, check out
--- the 'Data.Dynamic.KdTree' module.
+-- the @Data.KdTree.@'Data.KdTree.Dynamic' module.
 
 -- $kdmaps
 --
 -- If you need to associate additional data with each point in the
 -- tree (i.e., points are /keys/ associated with /values/), check out
--- the 'Data.KdMap' and 'Data.Dynamic.KdMap' modules for
--- static and dynamic variants of this functionality. Please /do not/
--- try to fake this functionality with a 'KdTree' by augmenting your
--- point type with the extra data; you're gonna have a bad time.
+-- the @Data.KdMap.@'Data.KdMap.Static' and
+-- @Data.KdMap.@'Data.KdMap.Dynamic' modules for static and dynamic
+-- variants of this functionality. Please /do not/ try to fake this
+-- functionality with a 'KdTree' by augmenting your point type with
+-- the extra data; you're gonna have a bad time.
 
 -- $customdistancefunctions
 --
