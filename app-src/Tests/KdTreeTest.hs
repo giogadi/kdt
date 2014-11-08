@@ -1,5 +1,5 @@
-import Data.Trees.KdMap as KDM
-import Data.Trees.DynKdMap as DKDM
+import Data.KdMap as KDM
+import Data.Dynamic.KdMap as DKDM
 
 import Control.Monad
 import System.Exit

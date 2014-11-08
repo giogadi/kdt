@@ -1,4 +1,4 @@
-module Data.Trees.DynKdTree
+module Data.Dynamic.KdTree
        ( -- * Usage
 
          -- $usage
@@ -31,8 +31,8 @@ import Prelude hiding (null)
 
 import Data.Foldable
 
-import qualified Data.Trees.DynKdMap as DKDM
-import Data.Trees.DynKdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
+import qualified Data.Dynamic.KdMap as DKDM
+import Data.Dynamic.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 
 -- $usage
 --
@@ -58,7 +58,7 @@ import Data.Trees.DynKdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- Point3D {x = 0.5, y = 0.5, z = 0.5}
 -- @
 --
--- Check out the 'Data.Trees.DynKdMap' module if you want to associate a value
+-- Check out the 'Data.Dynamic.KdMap' module if you want to associate a value
 -- with each point in your tree structure.
 
 -- | A dynamic /k/-d tree structure that stores points of type @p@

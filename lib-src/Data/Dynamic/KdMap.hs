@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
-module Data.Trees.DynKdMap
+module Data.Dynamic.KdMap
        ( -- * Usage
 
          -- $usage
@@ -51,14 +51,14 @@ import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
 
 import Data.Point2d
-import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
+import qualified Data.KdMap as KDM
+import Data.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 
 -- $usage
 --
--- The 'DynKdMap' is a variant of 'Data.Trees.DynKdTree' where each
+-- The 'DynKdMap' is a variant of 'Data.DynKdTree' where each
 -- point in the tree is associated with some data. It is the dynamic
--- variant of 'Data.Trees.KdMap'.
+-- variant of 'Data.KdMap'.
 --
 -- Here's an example of interleaving point-value insertions and point
 -- queries using 'DynKdMap', where points are 3D points and values are

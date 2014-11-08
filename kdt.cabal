@@ -20,10 +20,10 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Data.Trees.KdMap,
-                       Data.Trees.KdTree,
-                       Data.Trees.DynKdMap,
-                       Data.Trees.DynKdTree,
+  exposed-modules:     Data.KdMap,
+                       Data.KdTree,
+                       Data.Dynamic.KdMap,
+                       Data.Dynamic.KdTree,
                        Data.Point2d
   -- other-modules:
   other-extensions:    DeriveGeneric, TemplateHaskell
