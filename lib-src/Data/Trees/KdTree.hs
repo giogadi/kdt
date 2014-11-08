@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Data.Trees.KdTree
        ( PointAsListFn
        , SquaredDistanceFn
@@ -9,14 +11,26 @@ module Data.Trees.KdTree
        , kNearestNeighbors
        , points
        , size
+       , Point2d (..)
+       , pointAsList2d
+       , distSqr2d
        ) where
+
+import Control.DeepSeq
+import Control.DeepSeq.Generics (genericRnf)
+import GHC.Generics
 
 import Data.Foldable
 
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
+import Data.Trees.KdMap (PointAsListFn,
+                         SquaredDistanceFn,
+                         Point2d (..),
+                         pointAsList2d,
+                         distSqr2d)
 
-newtype KdTree a p = KdTree (KDM.KdMap a p ())
+newtype KdTree a p = KdTree (KDM.KdMap a p ()) deriving Generic
+instance (NFData a, NFData p) => NFData (KdTree a p) where rnf = genericRnf
 
 instance Foldable (KdTree a) where
   foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
