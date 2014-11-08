@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE DeriveGeneric #-}
 
 module Data.Point2d where

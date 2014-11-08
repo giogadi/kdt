@@ -20,14 +20,14 @@ zeroOnePointSampler =
 -- for nearest neighbor
 interleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 interleaveBuildQuery =
-  let f :: (DkdMap Double Point2d (), [Point2d]) ->
+  let f :: (DynKdMap Double Point2d (), [Point2d]) ->
            (Point2d, Point2d) ->
-           (DkdMap Double Point2d (), [Point2d])
+           (DynKdMap Double Point2d (), [Point2d])
       f (kdt, accList) (treePt, queryPt) =
         let newKdt = Data.Trees.DynKdMap.insert kdt treePt ()
             (nearest, _) = Data.Trees.DynKdMap.nearestNeighbor newKdt queryPt
         in  (newKdt, nearest : accList)
-      start = (emptyDkdMapWithDistFn pointAsList2d distSqr2d, [])
+      start = (emptyDynKdMapWithDistFn pointAsList2d distSqr2d, [])
   in  snd . foldl' f start
 
 nearestLinear :: [Point2d] -> Point2d -> Point2d
@@ -74,7 +74,7 @@ main =
                           (take 5000 queryPoints)
                       ],
       bgroup "dkdtree" [ bench "batch-5000" $ nf
-                           (batchInsert $ emptyDkdMapWithDistFn pointAsList2d distSqr2d)
+                           (batchInsert $ emptyDynKdMapWithDistFn pointAsList2d distSqr2d)
                            (zip (take 5000 treePoints) $ repeat ()),
                          bench "interleave-5000" $ nf
                            interleaveBuildQuery

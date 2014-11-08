@@ -8,20 +8,25 @@ module Data.Trees.KdMap
 
          -- * Reference
 
+         -- ** Types
          PointAsListFn
-       , KdMap
-       , buildKdMap
        , SquaredDistanceFn
-       , defaultDistSqrFn
+       , KdMap
+         -- ** /k/-d map construction
+       , buildKdMap
        , buildKdMapWithDistFn
+         -- ** Query
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
-       , size
        , assocs
        , keys
        , values
+       , size
+         -- ** Folds
        , foldrKdMap
+         -- ** Utilities
+       , defaultDistSqrFn
        , runTests
        ) where
 

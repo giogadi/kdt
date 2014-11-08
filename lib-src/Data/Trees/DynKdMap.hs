@@ -7,25 +7,31 @@ module Data.Trees.DynKdMap
 
          -- * Reference
 
-       PointAsListFn
-       , DynKdMap
-       , emptyDynKdMap
-       , null
-       , singleton
+         -- ** Types
+         PointAsListFn
        , SquaredDistanceFn
-       , defaultDistSqrFn
+       , DynKdMap
+         -- ** Dynamic /k/-d map construction
+       , emptyDynKdMap
+       , singleton
        , emptyDynKdMapWithDistFn
        , singletonWithDistFn
+         -- ** Insertion
        , insert
+       , batchInsert
+         -- ** Query
        , nearestNeighbor
-       , kNearestNeighbors
        , nearNeighbors
-       , size
+       , kNearestNeighbors
        , assocs
        , keys
        , values
-       , batchInsert
+       , null
+       , size
+         -- ** Folds
        , foldrDynKdMap
+         -- ** Utilities
+       , defaultDistSqrFn
        , runTests
        ) where
 

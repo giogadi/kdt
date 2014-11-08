@@ -5,21 +5,26 @@ module Data.Trees.DynKdTree
 
          -- * Reference
 
+         -- ** Types
          PointAsListFn
-       , DynKdTree
-       , emptyDynKdTree
-       , null
-       , singleton
        , SquaredDistanceFn
-       , defaultDistSqrFn
+       , DynKdTree
+         -- ** Dynamic /k/-d tree construction
+       , emptyDynKdTree
+       , singleton
        , emptyDynKdTreeWithDistFn
        , singletonWithDistFn
+         -- ** Insertion
        , insert
+         -- ** Query
        , nearestNeighbor
-       , kNearestNeighbors
        , nearNeighbors
-       , size
+       , kNearestNeighbors
        , points
+       , null
+       , size
+         -- ** Utilities
+       , defaultDistSqrFn
        ) where
 
 import Prelude hiding (null)

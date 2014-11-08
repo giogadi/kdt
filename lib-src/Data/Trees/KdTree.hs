@@ -31,17 +31,21 @@ module Data.Trees.KdTree
 
          -- * Reference
 
+         -- ** Types
          PointAsListFn
-       , KdTree
-       , buildKdTree
        , SquaredDistanceFn
-       , defaultDistSqrFn
+       , KdTree
+         -- ** /k/-d tree construction
+       , buildKdTree
        , buildKdTreeWithDistFn
+         -- ** Query
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
        , points
        , size
+         -- ** Utilities
+       , defaultDistSqrFn
        ) where
 
 import Control.DeepSeq

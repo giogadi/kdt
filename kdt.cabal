@@ -23,8 +23,9 @@ library
   exposed-modules:     Data.Trees.KdMap,
                        Data.Trees.KdTree,
                        Data.Trees.DynKdMap,
-                       Data.Trees.DynKdTree
-  other-modules:       Data.Point2d
+                       Data.Trees.DynKdTree,
+                       Data.Point2d
+  -- other-modules:
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
   ghc-prof-options:    -Wall -O3 -fprof-auto
