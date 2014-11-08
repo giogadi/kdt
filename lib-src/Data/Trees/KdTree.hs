@@ -32,16 +32,10 @@ module Data.Trees.KdTree
          -- * Reference
 
          PointAsListFn
-         -- | Converts a point of type @k@ with axis values of type
-         -- @a@ into a list of axis values [a].
-
        , KdTree
        , buildKdTree
-
        , SquaredDistanceFn
-         -- | Returns the squared distance between two points of type
-         -- @k@ with axis values of type @a@.
-
+       , defaultDistSqrFn
        , buildKdTreeWithDistFn
        , nearestNeighbor
        , nearNeighbors
@@ -57,7 +51,7 @@ import GHC.Generics
 import Data.Foldable
 
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
+import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 
 -- $intro
 --
@@ -81,7 +75,7 @@ import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
 -- data Point3d = Point3d { _x :: Double
 --                        , _y :: Double
 --                        , _z :: Double
---                        }
+--                        } deriving Show
 -- @
 --
 -- We call a point's individual values /axis values/ (i.e., @x@, @y@,
@@ -185,7 +179,7 @@ instance Foldable (KdTree a) where
   foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
 
 -- | Builds a 'KdTree' from a list of data points using a default
--- squared distance function 'Data.Trees.KdMap.defaultDistSqrFn'.
+-- squared distance function 'defaultDistSqrFn'.
 --
 -- Average complexity: /O(n * log(n))/ for /n/ data points.
 --
@@ -231,7 +225,7 @@ nearNeighbors :: Real a => KdTree a p
                            -> a -- ^ radius
                            -> p -- ^ query point
                            -> [p] -- ^ list of points in tree with
-                                  -- give radius of query point
+                                  -- given radius of query point
 nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius query
 
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
@@ -247,7 +241,7 @@ kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 points :: KdTree a p -> [p]
 points (KdTree t) = KDM.keys t
 
--- | Returns the number of elements in a 'KdTree'.
+-- | Returns the number of elements in the 'KdTree'.
 --
 -- Time complexity: /O(1)/
 size :: KdTree a p -> Int

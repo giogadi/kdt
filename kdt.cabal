@@ -3,7 +3,7 @@
 
 name:                kdt
 version:             0.1.0.0
-synopsis:            Static and dynamic Kd-trees for nearest neighbor lookups
+synopsis:            Fast and flexible k-d trees for various types of point queries.
 -- description:
 license:             MIT
 license-file:        LICENSE
