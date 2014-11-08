@@ -66,7 +66,7 @@ import Data.Point2d
 -- >>> let kdm = buildKdMap point3dAsList keyValuePairs
 --
 -- >>> nearestNeighbor kdm (Point3d 0.1 0.1 0.1)
--- [(Point3d 0.0 0.0 0.0), \"First\"]
+-- [Point3d {x = 0.0, y = 0.0, z = 0.0}, \"First\"]
 -- @
 
 data TreeNode a k v = TreeNode { _treeLeft :: TreeNode a k v

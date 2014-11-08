@@ -45,12 +45,12 @@ import Data.Trees.DynKdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- >>> let dkdt' = insert dkdt (Point3D 1.0 1.0 1.0)
 --
 -- >>> nearestNeighbor dkdt' (Point3D 0.4 0.4 0.4)
--- Point3D 0.0 0.0 0.0
+-- Point3D {x = 0.0, y = 0.0, z = 0.0}
 --
 -- >>> let dkdt'' = insert dkdt' (Point3D 0.5 0.5 0.5)
 --
 -- >>> nearestNeighbor dkdt'' (Point3D 0.4 0.4 0.4)
--- Point3D 0.5 0.5 0.5
+-- Point3D {x = 0.5, y = 0.5, z = 0.5}
 -- @
 --
 -- Check out the 'Data.Trees.DynKdMap' module if you want to associate a value

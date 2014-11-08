@@ -72,9 +72,9 @@ import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- type @Point3d@:
 --
 -- @
--- data Point3d = Point3d { _x :: Double
---                        , _y :: Double
---                        , _z :: Double
+-- data Point3d = Point3d { x :: Double
+--                        , y :: Double
+--                        , z :: Double
 --                        } deriving Show
 -- @
 --
@@ -100,7 +100,7 @@ import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- >>> let queryPoint = Point3d 0.1 0.1 0.1
 --
 -- >>> 'nearestNeighbor' kdt queryPoint
--- Point3d 0.0 0.0 0.0
+-- Point3d {x = 0.0, y = 0.0, z = 0.0}
 -- @
 
 -- $dkdtrees

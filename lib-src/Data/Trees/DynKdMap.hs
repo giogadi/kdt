@@ -64,12 +64,12 @@ import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- >>> let dkdm' = insert dkdm ((Point3D 1.0 1.0 1.0), \"Second\")
 --
 -- >>> nearestNeighbor dkdm' (Point3D 0.4 0.4 0.4)
--- ((Point3D 0.0 0.0 0.0), \"First\")
+-- (Point3D {x = 0.0, y = 0.0, z = 0.0}, \"First\")
 --
 -- >>> let dkdm'' = insert dkdm' ((Point3D 0.5 0.5 0.5), \"Third\")
 --
 -- >>> nearestNeighbor dkdm'' (Point3D 0.4 0.4 0.4)
--- ((Point3D 0.5 0.5 0.5), \"Third\")
+-- (Point3D {x = 0.5, y = 0.5, z = 0.5}, \"Third\")
 -- @
 
 -- | A dynamic /k/-d tree structure that stores points of type @k@
