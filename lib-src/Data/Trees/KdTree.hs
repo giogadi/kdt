@@ -107,13 +107,13 @@ import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 --
 -- The 'KdTree' structure is meant for static sets of data points. If
 -- you need to insert points into an existing /k/-d tree, check out
--- the 'Data.Trees.DynamicKdTree' module.
+-- the 'Data.Trees.DynKdTree' module.
 
 -- $kdmaps
 --
 -- If you need to associate additional data with each point in the
 -- tree (i.e., points are /keys/ associated with /values/), check out
--- the 'Data.Trees.KdMap' and 'Data.Trees.DynamicKdMap' modules for
+-- the 'Data.Trees.KdMap' and 'Data.Trees.DynKdMap' modules for
 -- static and dynamic variants of this functionality. Please /do not/
 -- try to fake this functionality with a 'KdTree' by augmenting your
 -- point type with the extra data; you're gonna have a bad time.

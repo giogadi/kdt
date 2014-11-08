@@ -3,9 +3,12 @@
 module Data.Trees.DynKdMap
        ( DynKdMap
        , PointAsListFn
-       , SquaredDistanceFn
        , emptyDynKdMap
        , singleton
+       , SquaredDistanceFn
+       , defaultDistSqrFn
+       , emptyDynKdMapWithDistFn
+       , singletonWithDistFn
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
@@ -38,7 +41,7 @@ import Test.QuickCheck hiding ((.&.))
 
 import Data.Point2d
 import qualified Data.Trees.KdMap as KDM
-import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn)
+import Data.Trees.KdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 
 data DynKdMap a k v = DynKdMap
                       { _trees       :: [KDM.KdMap a k v]
@@ -61,16 +64,22 @@ instance Traversable (DynKdMap a k) where
   traverse f (DynKdMap t p d n) =
     DynKdMap <$> traverse (traverse f) t <*> pure p <*> pure d <*> pure n
 
-emptyDynKdMap :: PointAsListFn a k -> SquaredDistanceFn a k -> DynKdMap a k v
-emptyDynKdMap p2l d2 = DynKdMap [] p2l d2 0
+emptyDynKdMapWithDistFn :: PointAsListFn a k -> SquaredDistanceFn a k -> DynKdMap a k v
+emptyDynKdMapWithDistFn p2l d2 = DynKdMap [] p2l d2 0
 
 null :: DynKdMap a k v -> Bool
 null (DynKdMap [] _ _ _) = True
 null _ = False
 
-singleton :: Real a => PointAsListFn a k -> SquaredDistanceFn a k -> (k, v) -> DynKdMap a k v
-singleton p2l d2 (k, v) =
+singletonWithDistFn :: Real a => PointAsListFn a k -> SquaredDistanceFn a k -> (k, v) -> DynKdMap a k v
+singletonWithDistFn p2l d2 (k, v) =
   DynKdMap [KDM.buildKdMapWithDistFn p2l d2 [(k, v)]] p2l d2 1
+
+emptyDynKdMap :: Real a => PointAsListFn a k -> DynKdMap a k v
+emptyDynKdMap p2l = emptyDynKdMapWithDistFn p2l $ defaultDistSqrFn p2l
+
+singleton :: Real a => PointAsListFn a k -> (k, v) -> DynKdMap a k v
+singleton p2l = singletonWithDistFn p2l $ defaultDistSqrFn p2l
 
 nearestNeighbor :: Real a => DynKdMap a k v -> k -> (k, v)
 nearestNeighbor (DynKdMap ts _ d2 _) query =
@@ -133,7 +142,7 @@ testElements ps = zip ps [1 ..]
 checkLogNTrees :: Real a => PointAsListFn a k -> SquaredDistanceFn a k -> [k] -> Bool
 checkLogNTrees p2l d2 ps =
   let lengthIsLogN (DynKdMap ts _ _ n) = length ts == popCount n
-  in  L.all lengthIsLogN $ scanl insertPair (emptyDynKdMap p2l d2) $ testElements ps
+  in  L.all lengthIsLogN $ scanl insertPair (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
 
 prop_logNTrees :: [Point2d] -> Bool
 prop_logNTrees = checkLogNTrees pointAsList2d distSqr2d
@@ -144,7 +153,7 @@ checkTreeSizesPowerOf2 :: Real a => PointAsListFn a k ->
                                     Bool
 checkTreeSizesPowerOf2 p2l d2 ps =
   let sizesPowerOf2 (DynKdMap ts _ _ _) = L.all (== 1) $ map (popCount . length . KDM.assocs) ts
-  in  L.all sizesPowerOf2 $ scanl insertPair (emptyDynKdMap p2l d2) $ testElements ps
+  in  L.all sizesPowerOf2 $ scanl insertPair (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
 
 prop_treeSizesPowerOf2 :: [Point2d] -> Bool
 prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 pointAsList2d distSqr2d
@@ -152,7 +161,7 @@ prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 pointAsList2d distSqr2d
 checkNumElements :: Real a => PointAsListFn a k -> SquaredDistanceFn a k -> [k] -> Bool
 checkNumElements p2l d2 ps =
   let numsMatch (num, DynKdMap ts _ _ n) = n == num && n == L.sum (map (length . KDM.assocs) ts)
-  in  L.all numsMatch $ zip [0..] $ scanl insertPair (emptyDynKdMap p2l d2) $ testElements ps
+  in  L.all numsMatch $ zip [0..] $ scanl insertPair (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
 
 prop_validNumElements :: [Point2d] -> Bool
 prop_validNumElements = checkNumElements pointAsList2d distSqr2d
@@ -164,7 +173,7 @@ checkNearestEqualToBatch :: (Eq k, Real a) => PointAsListFn a k ->
 checkNearestEqualToBatch p2l d2 (ps, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearestNeighbor kdt query
-      dkdt = batchInsert (emptyDynKdMap p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
       dkdtAnswer = nearestNeighbor dkdt query
   in  dkdtAnswer == kdtAnswer
 
@@ -180,7 +189,7 @@ checkKNearestEqualToBatch :: (Eq k, Real a) => PointAsListFn a k ->
 checkKNearestEqualToBatch p2l d2 (ps, k, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.kNearestNeighbors kdt k query
-      dkdt = batchInsert (emptyDynKdMap p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
       dkdtAnswer = kNearestNeighbors dkdt k query
   in  dkdtAnswer == kdtAnswer
 
@@ -197,7 +206,7 @@ checkNearEqualToBatch :: (Ord k, Real a) => PointAsListFn a k ->
 checkNearEqualToBatch p2l d2 (ps, radius, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
       kdtAnswer = KDM.nearNeighbors kdt radius query
-      dkdt = batchInsert (emptyDynKdMap p2l d2) $ testElements ps
+      dkdt = batchInsert (emptyDynKdMapWithDistFn p2l d2) $ testElements ps
       dkdtAnswer = nearNeighbors dkdt radius query
   in  sort dkdtAnswer == sort kdtAnswer
 
