@@ -4,6 +4,7 @@
 module Data.Trees.KdMap
        ( PointAsListFn
        , SquaredDistanceFn
+       , defaultDistSqrFn
        , KdMap
        , buildKdMap
        , buildKdMapWithDistFn
