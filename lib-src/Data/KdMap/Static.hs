@@ -123,10 +123,12 @@ instance Foldable (KdMap a p) where
 
 traverseTreeNode :: Applicative f => (b -> f c) -> TreeNode a p b -> f (TreeNode a p c)
 traverseTreeNode _ Empty = pure Empty
-traverseTreeNode f (TreeNode l p axisValue r) =
+traverseTreeNode f (TreeNode l (p, v) axisValue r) =
   TreeNode <$>
     traverseTreeNode f l <*>
-    traverse f p <*>
+    ((,) p <$> f v) <*> -- would simply be traverse f (p, v), but
+                        -- base-4.6.* doesn't have a Traversable
+                        -- instance for tuples.
     pure axisValue <*>
     traverseTreeNode f r
 
