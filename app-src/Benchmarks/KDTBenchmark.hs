@@ -1,6 +1,6 @@
 import Data.Point2d
 import Data.Trees.KdMap
-import Data.Trees.DynamicKdMap
+import Data.Trees.DynKdMap
 
 import Control.Monad
 import qualified Control.Monad.Random as CMR
@@ -24,8 +24,8 @@ interleaveBuildQuery =
            (Point2d, Point2d) ->
            (DkdMap Double Point2d (), [Point2d])
       f (kdt, accList) (treePt, queryPt) =
-        let newKdt = Data.Trees.DynamicKdMap.insert kdt treePt ()
-            (nearest, _) = Data.Trees.DynamicKdMap.nearestNeighbor newKdt queryPt
+        let newKdt = Data.Trees.DynKdMap.insert kdt treePt ()
+            (nearest, _) = Data.Trees.DynKdMap.nearestNeighbor newKdt queryPt
         in  (newKdt, nearest : accList)
       start = (emptyDkdMap pointAsList2d distSqr2d, [])
   in  snd . foldl' f start

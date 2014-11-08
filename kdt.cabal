@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Data.Trees.KdMap,
                        Data.Trees.KdTree,
-                       Data.Trees.DynamicKdMap,
+                       Data.Trees.DynKdMap,
                        Data.Trees.DynamicKdTree
   other-modules:       Data.Point2d
   other-extensions:    DeriveGeneric, TemplateHaskell

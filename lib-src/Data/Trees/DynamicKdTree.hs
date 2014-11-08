@@ -17,16 +17,16 @@ import Prelude hiding (null)
 
 import Data.Foldable
 
-import qualified Data.Trees.DynamicKdMap as DKDM
-import Data.Trees.DynamicKdMap (PointAsListFn, SquaredDistanceFn)
+import qualified Data.Trees.DynKdMap as DKDM
+import Data.Trees.DynKdMap (PointAsListFn, SquaredDistanceFn)
 
-newtype DkdTree a p = DkdTree (DKDM.DkdMap a p ())
+newtype DkdTree a p = DkdTree (DKDM.DynKdMap a p ())
 
 instance Foldable (DkdTree a) where
-  foldr f z (DkdTree dkdMap) = DKDM.foldrDkdMap (f . fst) z dkdMap
+  foldr f z (DkdTree dkdMap) = DKDM.foldrDynKdMap (f . fst) z dkdMap
 
 emptyDkdTree :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> DkdTree a p
-emptyDkdTree p2l d2 = DkdTree $ DKDM.emptyDkdMap p2l d2
+emptyDkdTree p2l d2 = DkdTree $ DKDM.emptyDynKdMap p2l d2
 
 null :: DkdTree a p -> Bool
 null (DkdTree dkdMap) = DKDM.null dkdMap
