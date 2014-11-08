@@ -217,7 +217,7 @@ nearestNeighbor :: Real a => KdTree a p -> p -> p
 nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
 
 -- | Given a 'KdTree', a query point, and a radius, returns all
--- points in the /k/-d tree that are within the given radius of the
+-- points in the 'KdTree' that are within the given radius of the
 -- query point.
 --
 -- TODO: time complexity.

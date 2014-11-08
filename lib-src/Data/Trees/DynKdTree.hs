@@ -11,6 +11,7 @@ module Data.Trees.DynKdTree
        , null
        , singleton
        , SquaredDistanceFn
+       , defaultDistSqrFn
        , emptyDynKdTreeWithDistFn
        , singletonWithDistFn
        , insert
@@ -46,7 +47,7 @@ import Data.Trees.DynKdMap (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- >>> nearestNeighbor dkdt' (Point3D 0.4 0.4 0.4)
 -- Point3D 0.0 0.0 0.0
 --
--- >>> let dkdt'' = insert dkdt (Point3D 0.5 0.5 0.5)
+-- >>> let dkdt'' = insert dkdt' (Point3D 0.5 0.5 0.5)
 --
 -- >>> nearestNeighbor dkdt'' (Point3D 0.4 0.4 0.4)
 -- Point3D 0.5 0.5 0.5
@@ -106,7 +107,7 @@ kNearestNeighbors (DynKdTree dkdMap) k query =
   map fst $ DKDM.kNearestNeighbors dkdMap k query
 
 -- | Given a 'DynKdTree', a query point, and a radius, returns all
--- points in the /k/-d tree that are within the given radius of the
+-- points in the 'DynKdTree' that are within the given radius of the
 -- query points.
 --
 -- TODO: time complexity.

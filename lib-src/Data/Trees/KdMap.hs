@@ -256,7 +256,7 @@ nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
           else nearestInTree right left
 
 -- | Given a 'KdMap', a query key, and a radius, returns all key-value
--- pairs in the /k/-d tree with keys within the given radius of the
+-- pairs in the 'KdMap' with keys within the given radius of the
 -- query point.
 --
 -- TODO: time complexity.
