@@ -130,4 +130,4 @@ size (DynKdTree dkdMap) = DKDM.size dkdMap
 --
 -- Time complexity: /O(n)/
 points :: DynKdTree a p -> [p]
-points (DynKdTree dkdMap) = DKDM.keys dkdMap
+points (DynKdTree dkdMap) = DKDM.points dkdMap

@@ -243,7 +243,7 @@ kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 --
 -- Time complexity: /O(n)/ for /n/ data points.
 points :: KdTree a p -> [p]
-points (KdTree t) = KDM.keys t
+points (KdTree t) = KDM.points t
 
 -- | Returns the number of elements in the 'KdTree'.
 --
