@@ -151,7 +151,9 @@ quickselect cmp = go
 --
 -- Average time complexity: /O(n * log(n))/ for /n/ data points.
 --
--- Worse case space complexity: /O(n)/ for /n/ data points.
+-- Worst case time complexity: /O(n^2)/ for /n/ data points.
+--
+-- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
 buildKdMapWithDistFn :: Real a => PointAsListFn a p ->
@@ -199,7 +201,9 @@ defaultDistSqrFn pointAsList k1 k2 =
 --
 -- Average complexity: /O(n * log(n))/ for /n/ data points.
 --
--- Worse case space complexity: /O(n)/ for /n/ data points.
+-- Worst case time complexity: /O(n^2)/ for /n/ data points.
+--
+-- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
 buildKdMap :: Real a => PointAsListFn a p -> [(p, v)] -> KdMap a p v
@@ -233,6 +237,8 @@ values = map snd . assocs
 -- in the 'KdMap' with the point nearest to the query.
 --
 -- Average time complexity: /O(log(n))/ for /n/ data points.
+--
+-- Worst case time complexity: /O(n)/ for /n/ data points.
 nearestNeighbor :: Real a => KdMap a p v -> p -> (p, v)
 nearestNeighbor (KdMap _ _ Empty _) _ =
   error "nearestNeighbor: why is there an empty KdMap?"
@@ -266,13 +272,17 @@ nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
 -- point-value pairs in the 'KdMap' with points within the given
 -- radius of the query point.
 --
--- TODO: time complexity.
+-- Worst case time complexity: /O(n * log(n))/ for /n/ data points and
+-- a radius that subsumes all points in the structure.
 nearNeighbors :: Real a => KdMap a p v
                            -> a -- ^ radius
                            -> p -- ^ query point
                            -> [(p, v)] -- ^ list of point-value pairs
                                        -- with points within given
                                        -- radius of query
+
+-- TODO: Get down to O(n) by doing better than naive list
+-- concatenation
 nearNeighbors (KdMap pointAsList distSqr t _) radius query =
   go (cycle $ pointAsList query) t
   where
@@ -296,7 +306,11 @@ nearNeighbors (KdMap pointAsList distSqr t _) radius query =
 -- | Given a 'KdMap', a query point, and a number @k@, returns the @k@
 -- point-value pairs with the nearest points to the query.
 --
--- TODO: time complexity.
+-- Average time complexity: /log(k) * log(n)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
+--
+-- Worst case time complexity: /n * log(k)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
 kNearestNeighbors :: Real a => KdMap a p v -> Int -> p -> [(p, v)]
 kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
   reverse $ map snd $ Q.toList $ go (cycle $ pointAsList query) Q.empty t

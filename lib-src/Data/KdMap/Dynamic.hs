@@ -156,7 +156,11 @@ insertPair t = uncurry (insert t)
 -- | Given a 'KdMap', a query point, and a number @k@, returns the
 -- @k@ point-value pairs with the nearest points to the query.
 --
--- TODO: time complexity.
+-- Average time complexity: /log(k) * log^2(n)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
+--
+-- Worst case time complexity: /n * log(k)/ for /k/ nearest neighbors
+-- on a structure with /n/ data points.
 kNearestNeighbors :: Real a => KdMap a p v -> Int -> p -> [(p, v)]
 kNearestNeighbors (KdMap trees _ d2 _) k query =
   let neighborSets = map (\t -> KDM.kNearestNeighbors t k query) trees
@@ -173,7 +177,8 @@ kNearestNeighbors (KdMap trees _ d2 _) k query =
 -- point-value pairs in the 'KdTree' with points within the given
 -- radius of the query point.
 --
--- TODO: time complexity.
+-- Worst case time complexity: /sum_{i = 1}^{log(n)} i * 2^i/. TODO:
+-- figure this out.
 nearNeighbors :: Real a => KdMap a p v -> a -> p -> [(p, v)]
 nearNeighbors (KdMap trees _ _ _) radius query =
   L.concatMap (\t -> KDM.nearNeighbors t radius query) trees

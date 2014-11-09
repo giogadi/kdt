@@ -107,7 +107,11 @@ nearestNeighbor (KdTree dkdMap) = fst . DKDM.nearestNeighbor dkdMap
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
 -- @k@ nearest points in the 'KdTree' to the query point.
 --
--- TODO: time complexity.
+-- Average time complexity: /log(k) * log^2(n)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
+--
+-- Worst case time complexity: /n * log(k)/ for /k/ nearest neighbors
+-- on a structure with /n/ data points.
 kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
 kNearestNeighbors (KdTree dkdMap) k query =
   map fst $ DKDM.kNearestNeighbors dkdMap k query
@@ -116,7 +120,8 @@ kNearestNeighbors (KdTree dkdMap) k query =
 -- points in the 'KdTree' that are within the given radius of the
 -- query points.
 --
--- TODO: time complexity.
+-- Worst case time complexity: /sum_{i = 1}^{log(n)} i * 2^i/. TODO:
+-- figure this out.
 nearNeighbors :: Real a => KdTree a p -> a -> p -> [p]
 nearNeighbors (KdTree dkdMap) radius query =
   map fst $ DKDM.nearNeighbors dkdMap radius query

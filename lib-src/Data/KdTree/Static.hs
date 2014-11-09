@@ -188,7 +188,9 @@ instance Foldable (KdTree a) where
 --
 -- Average complexity: /O(n * log(n))/ for /n/ data points.
 --
--- Worse case space complexity: /O(n)/ for /n/ data points.
+-- Worst case time complexity: /O(n^2)/ for /n/ data points.
+--
+-- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
 buildKdTree :: Real a => PointAsListFn a p
@@ -203,7 +205,9 @@ buildKdTree pointAsList ps =
 --
 -- Average time complexity: /O(n * log(n))/ for /n/ data points.
 --
--- Worse case space complexity: /O(n)/ for /n/ data points.
+-- Worst case time complexity: /O(n^2)/ for /n/ data points.
+--
+-- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
 buildKdTreeWithDistFn :: Real a => PointAsListFn a p
@@ -218,6 +222,8 @@ buildKdTreeWithDistFn pointAsList distSqr ps =
 -- in the 'KdTree' to the query point.
 --
 -- Average time complexity: /O(log(n))/ for /n/ data points.
+--
+-- Worst case time complexity: /O(n)/ for /n/ data points.
 nearestNeighbor :: Real a => KdTree a p -> p -> p
 nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
 
@@ -225,7 +231,8 @@ nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
 -- points in the 'KdTree' that are within the given radius of the
 -- query point.
 --
--- TODO: time complexity.
+-- Worst case time complexity: /O(n * log(n))/ for /n/ data points and
+-- a radius that subsumes all points in the structure.
 nearNeighbors :: Real a => KdTree a p
                            -> a -- ^ radius
                            -> p -- ^ query point
@@ -236,7 +243,11 @@ nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius que
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
 -- @k@ nearest points in the 'KdTree' to the query point.
 --
--- TODO: time complexity.
+-- Average time complexity: /log(k) * log(n)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
+--
+-- Worst case time complexity: /n * log(k)/ for /k/ nearest
+-- neighbors on a structure with /n/ data points.
 kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
 kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 
