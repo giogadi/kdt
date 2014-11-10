@@ -120,8 +120,7 @@ kNearestNeighbors (KdTree dkdMap) k query =
 -- points in the 'KdTree' that are within the given radius of the
 -- query points.
 --
--- Worst case time complexity: /sum_{i = 1}^{log(n)} i * 2^i/. TODO:
--- figure this out.
+-- Worst case time complexity: /O(n * log(n))/ for /n/ data points.
 nearNeighbors :: Real a => KdTree a p -> a -> p -> [p]
 nearNeighbors (KdTree dkdMap) radius query =
   map fst $ DKDM.nearNeighbors dkdMap radius query

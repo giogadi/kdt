@@ -322,7 +322,7 @@ kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
       let insertBounded queue dist x
             | Q.size queue < numNeighbors = Q.insert dist x queue
             | otherwise = if dist < fst (Q.findMax queue)
-                          then Q.deleteMax $ Q.insert dist x queue
+                          then Q.insert dist x $ Q.deleteMax queue
                           else queue
           q' = insertBounded q (distSqr k query) (k, v)
           kNearest queue onsideSubtree offsideSubtree =

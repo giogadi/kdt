@@ -177,8 +177,7 @@ kNearestNeighbors (KdMap trees _ d2 _) k query =
 -- point-value pairs in the 'KdTree' with points within the given
 -- radius of the query point.
 --
--- Worst case time complexity: /sum_{i = 1}^{log(n)} i * 2^i/. TODO:
--- figure this out.
+-- Worst case time complexity: /O(n * log(n))/ for /n/ data points.
 nearNeighbors :: Real a => KdMap a p v -> a -> p -> [(p, v)]
 nearNeighbors (KdMap trees _ _ _) radius query =
   L.concatMap (\t -> KDM.nearNeighbors t radius query) trees
