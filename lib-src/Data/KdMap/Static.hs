@@ -272,7 +272,7 @@ nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
 -- point-value pairs in the 'KdMap' with points within the given
 -- radius of the query point.
 --
--- Worst case time complexity: /O(n * log(n))/ for /n/ data points and
+-- Worst case time complexity: /O(n)/ for /n/ data points and
 -- a radius that subsumes all points in the structure.
 nearNeighbors :: Real a => KdMap a p v
                            -> a -- ^ radius
@@ -280,28 +280,25 @@ nearNeighbors :: Real a => KdMap a p v
                            -> [(p, v)] -- ^ list of point-value pairs
                                        -- with points within given
                                        -- radius of query
-
--- TODO: Get down to O(n) by doing better than naive list
--- concatenation
 nearNeighbors (KdMap pointAsList distSqr t _) radius query =
-  go (cycle $ pointAsList query) t
+  go (cycle $ pointAsList query) t []
   where
-    go [] _ = error "nearNeighbors.go: no empty lists allowed!"
-    go _ Empty = []
-    go (queryAxisValue : qvs) (TreeNode left (k, v) nodeAxisVal right) =
+    go [] _ _ = error "nearNeighbors.go: no empty lists allowed!"
+    go _ Empty acc = acc
+    go (queryAxisValue : qvs) (TreeNode left (k, v) nodeAxisVal right) acc =
       let onTheLeft = queryAxisValue <= nodeAxisVal
-          onsideNear = if   onTheLeft
-                       then go qvs left
-                       else go qvs right
-          offsideNear = if   abs (queryAxisValue - nodeAxisVal) < radius
-                        then if   onTheLeft
-                             then go qvs right
-                             else go qvs left
-                        else []
-          currentNear = if distSqr k query <= radius * radius
-                        then [(k, v)]
-                        else []
-      in  onsideNear ++ currentNear ++ offsideNear
+          accAfterOnside = if   onTheLeft
+                           then go qvs left acc
+                           else go qvs right acc
+          accAfterOffside = if   abs (queryAxisValue - nodeAxisVal) < radius
+                            then if   onTheLeft
+                                 then go qvs right accAfterOnside
+                                 else go qvs left accAfterOnside
+                            else accAfterOnside
+          accAfterCurrent = if distSqr k query <= radius * radius
+                            then (k, v) : accAfterOffside
+                            else accAfterOffside
+      in  accAfterCurrent
 
 -- | Given a 'KdMap', a query point, and a number @k@, returns the @k@
 -- point-value pairs with the nearest points to the query.
