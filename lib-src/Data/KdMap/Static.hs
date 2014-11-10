@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
 
--- TODO: Implement range find?
 module Data.KdMap.Static
        ( -- * Usage
 
@@ -19,6 +18,7 @@ module Data.KdMap.Static
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
+       , pointsInRange
        , assocs
        , points
        , values
@@ -272,8 +272,8 @@ nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
 -- point-value pairs in the 'KdMap' with points within the given
 -- radius of the query point.
 --
--- Worst case time complexity: /O(n)/ for /n/ data points and
--- a radius that subsumes all points in the structure.
+-- Worst case time complexity: /O(n)/ for /n/ data points and a radius
+-- that spans all points in the structure.
 nearNeighbors :: Real a => KdMap a p v
                            -> a -- ^ radius
                            -> p -- ^ query point
@@ -333,6 +333,42 @@ kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
       in  if queryAxisValue <= nodeAxisVal
           then kNearest q' left right
           else kNearest q' right left
+
+-- | Finds all point-value pairs in a 'KdMap' with points within a
+-- given range, where the range is specified as a set of lower and
+-- upper bounds.
+--
+-- Worst case time complexity: /O(n)/ for n data points and a range
+-- that spans all the points.
+pointsInRange :: Real a => KdMap a p v
+                           -> p -- ^ lower bounds of range
+                           -> p -- ^ upper bounds of range
+                           -> [(p, v)] -- ^ point-value pairs within
+                                       -- given range
+pointsInRange (KdMap pointAsList _ t _) lowers uppers =
+  go (cycle (pointAsList lowers) `zip` cycle (pointAsList uppers)) t []
+  where
+    go [] _ _ = error "neighborsInRange.go: no empty lists allowed!"
+    go _ Empty acc = acc
+    go ((lower, upper) : nextBounds) (TreeNode left p nodeAxisVal right) acc =
+      let accAfterLeft = if lower <= nodeAxisVal
+                         then go nextBounds left acc
+                         else acc
+          accAfterRight = if upper > nodeAxisVal
+                          then go nextBounds right accAfterLeft
+                          else accAfterLeft
+          valInRange l x u = l <= x && x <= u
+          -- maybe "cache" lowers and uppers as lists sooner as hint
+          -- to ghc. Also, maybe only need to check previously
+          -- unchecked axes?
+          currentInRange =
+            L.all id $
+              zipWith3 valInRange
+                (pointAsList lowers) (pointAsList $ fst p) (pointAsList uppers)
+          accAfterCurrent = if currentInRange
+                            then p : accAfterRight
+                            else accAfterRight
+      in  accAfterCurrent
 
 -- | Returns the number of point-value pairs in the 'KdMap'.
 --
@@ -441,6 +477,25 @@ prop_kNearestSorted :: Point2d -> Property
 prop_kNearestSorted query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkKNearestSorted pointAsList2d (xs, query)
+
+rangeLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> p -> [(p, v)]
+rangeLinear pointAsList xs lowers uppers =
+  let valInRange a lower upper = lower <= a && a <= upper
+      lowersAsList = pointAsList lowers
+      uppersAsList = pointAsList uppers
+      pointInRange (p, _) =
+        L.all id $ zipWith3 valInRange (pointAsList p) lowersAsList uppersAsList
+  in  filter pointInRange xs
+
+prop_rangeEqualToLinear :: ([Point2d], Point2d, Point2d) -> Bool
+prop_rangeEqualToLinear (xs, lowers, uppers)
+  | null xs = True
+  | L.all id $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
+      let linear = rangeLinear pointAsList2d (testElements xs) lowers uppers
+          kdt    = buildKdMap pointAsList2d $ testElements xs
+          kdtPoints = pointsInRange kdt lowers uppers
+      in  L.sort linear == L.sort kdtPoints
+  | otherwise = True
 
 prop_equalAxisValueSameElems :: Property
 prop_equalAxisValueSameElems =

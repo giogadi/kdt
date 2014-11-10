@@ -20,6 +20,7 @@ module Data.KdTree.Dynamic
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
+       , pointsInRange
        , points
        , null
        , size
@@ -124,6 +125,18 @@ kNearestNeighbors (KdTree dkdMap) k query =
 nearNeighbors :: Real a => KdTree a p -> a -> p -> [p]
 nearNeighbors (KdTree dkdMap) radius query =
   map fst $ DKDM.nearNeighbors dkdMap radius query
+
+-- | Finds all points in a 'KdTree' with points within a given range,
+-- where the range is specified as a set of lower and upper bounds.
+--
+-- Worst case time complexity: /O(n)/ for n data points and a range
+-- that spans all the points.
+pointsInRange :: Real a => KdTree a p
+                           -> p -- ^ lower bounds of range
+                           -> p -- ^ upper bounds of range
+                           -> [p] -- ^ all points within given range
+pointsInRange (KdTree dkdMap) lowers uppers =
+  map fst $ DKDM.pointsInRange dkdMap lowers uppers
 
 -- | Returns the number of elements in the 'KdTree'.
 --

@@ -43,6 +43,7 @@ module Data.KdTree.Static
        , nearNeighbors
        , kNearestNeighbors
        , points
+       , pointsInRange
        , size
          -- ** Utilities
        , defaultDistSqrFn
@@ -250,6 +251,17 @@ nearNeighbors (KdTree t) radius query = map fst $ KDM.nearNeighbors t radius que
 -- neighbors on a structure with /n/ data points.
 kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
 kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
+
+-- | Finds all points in a 'KdTree' with points within a given range,
+-- where the range is specified as a set of lower and upper bounds.
+--
+-- Worst case time complexity: /O(n)/ for n data points and a range
+-- that spans all the points.
+pointsInRange :: Real a => KdTree a p
+                           -> p -- ^ lower bounds of range
+                           -> p -- ^ upper bounds of range
+                           -> [p] -- ^ all points within given range
+pointsInRange (KdTree t) lower upper = map fst $ KDM.pointsInRange t lower upper
 
 -- | Returns a list of all the points in the 'KdTree'.
 --

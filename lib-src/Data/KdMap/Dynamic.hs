@@ -23,6 +23,7 @@ module Data.KdMap.Dynamic
        , nearestNeighbor
        , nearNeighbors
        , kNearestNeighbors
+       , pointsInRange
        , assocs
        , points
        , values
@@ -181,6 +182,20 @@ kNearestNeighbors (KdMap trees _ d2 _) k query =
 nearNeighbors :: Real a => KdMap a p v -> a -> p -> [(p, v)]
 nearNeighbors (KdMap trees _ _ _) radius query =
   L.concatMap (\t -> KDM.nearNeighbors t radius query) trees
+
+-- | Finds all point-value pairs in a 'KdMap' with points within a
+-- given range, where the range is specified as a set of lower and
+-- upper bounds.
+--
+-- Worst case time complexity: /O(n)/ for n data points and a range
+-- that spans all the points.
+pointsInRange :: Real a => KdMap a p v
+                           -> p -- ^ lower bounds of range
+                           -> p -- ^ upper bounds of range
+                           -> [(p, v)] -- ^ point-value pairs within
+                                       -- given range
+pointsInRange (KdMap trees _ _ _) lowers uppers =
+  L.concatMap (\t -> KDM.pointsInRange t lowers uppers) trees
 
 -- | Returns the number of elements in the 'KdMap'.
 --
