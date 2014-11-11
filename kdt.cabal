@@ -9,6 +9,7 @@ description:         This package includes static and dynamic versions of k-d tr
                      k-d tree structure. Supports a variety of point query operations.
                      To learn to use this package, start with the documentation for
                      the "Data.KdTree.Static" module.
+homepage:            https://github.com/giogadi/kdt
 license:             MIT
 license-file:        LICENSE
 author:              Luis G. Torres
@@ -18,6 +19,10 @@ category:            Data
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
+source-repository head
+  type: git
+  location: https://github.com/giogadi/kdt.git
+  branch: master
 
 library
   exposed-modules:     Data.KdMap.Static,
