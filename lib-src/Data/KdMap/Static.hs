@@ -16,7 +16,7 @@ module Data.KdMap.Static
        , buildKdMapWithDistFn
          -- ** Query
        , nearestNeighbor
-       , nearNeighbors
+       , pointsInRadius
        , kNearestNeighbors
        , pointsInRange
        , assocs
@@ -272,18 +272,20 @@ nearestNeighbor (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
 -- point-value pairs in the 'KdMap' with points within the given
 -- radius of the query point.
 --
+-- Points are not returned in any particular order.
+--
 -- Worst case time complexity: /O(n)/ for /n/ data points and a radius
 -- that spans all points in the structure.
-nearNeighbors :: Real a => KdMap a p v
-                           -> a -- ^ radius
-                           -> p -- ^ query point
-                           -> [(p, v)] -- ^ list of point-value pairs
-                                       -- with points within given
-                                       -- radius of query
-nearNeighbors (KdMap pointAsList distSqr t _) radius query =
+pointsInRadius :: Real a => KdMap a p v
+                            -> a -- ^ radius
+                            -> p -- ^ query point
+                            -> [(p, v)] -- ^ list of point-value pairs
+                                        -- with points within given
+                                        -- radius of query
+pointsInRadius (KdMap pointAsList distSqr t _) radius query =
   go (cycle $ pointAsList query) t []
   where
-    go [] _ _ = error "nearNeighbors.go: no empty lists allowed!"
+    go [] _ _ = error "pointsInRadius.go: no empty lists allowed!"
     go _ Empty acc = acc
     go (queryAxisValue : qvs) (TreeNode left (k, v) nodeAxisVal right) acc =
       let onTheLeft = queryAxisValue <= nodeAxisVal
@@ -302,6 +304,9 @@ nearNeighbors (KdMap pointAsList distSqr t _) radius query =
 
 -- | Given a 'KdMap', a query point, and a number @k@, returns the @k@
 -- point-value pairs with the nearest points to the query.
+--
+-- Neighbors are returned in order of increasing distance from query
+-- point.
 --
 -- Average time complexity: /log(k) * log(n)/ for /k/ nearest
 -- neighbors on a structure with /n/ data points.
@@ -338,8 +343,14 @@ kNearestNeighbors (KdMap pointAsList distSqr t _) numNeighbors query =
 -- given range, where the range is specified as a set of lower and
 -- upper bounds.
 --
+-- Points are not returned in any particular order.
+--
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
+--
+-- TODO: Maybe use known bounds on entire tree structure to be able to
+-- automatically count whole portions of tree as being within given
+-- range.
 pointsInRange :: Real a => KdMap a p v
                            -> p -- ^ lower bounds of range
                            -> p -- ^ upper bounds of range
@@ -431,22 +442,22 @@ prop_nearestEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkNearestEqualToLinear pointAsList2d (xs, query)
 
-nearNeighborsLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
-nearNeighborsLinear pointAsList xs query radius =
+pointsInRadiusLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
+pointsInRadiusLinear pointAsList xs query radius =
   filter ((<= radius * radius) . defaultDistSqrFn pointAsList query . fst) xs
 
-checkNearEqualToLinear :: (Ord p, Real a) => PointAsListFn a p -> a -> ([p], p) -> Bool
-checkNearEqualToLinear pointAsList radius (ps, query) =
+checkInRadiusEqualToLinear :: (Ord p, Real a) => PointAsListFn a p -> a -> ([p], p) -> Bool
+checkInRadiusEqualToLinear pointAsList radius (ps, query) =
   let kdt = buildKdMap pointAsList $ testElements ps
-      kdtNear = nearNeighbors kdt radius query
-      linearNear = nearNeighborsLinear pointAsList (testElements ps) query radius
+      kdtNear = pointsInRadius kdt radius query
+      linearNear = pointsInRadiusLinear pointAsList (testElements ps) query radius
   in  L.sort kdtNear == L.sort linearNear
 
-prop_nearEqualToLinear :: Point2d -> Property
-prop_nearEqualToLinear query =
+prop_inRadiusEqualToLinear :: Point2d -> Property
+prop_inRadiusEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (0.0, 1000.0)) $ \radius ->
-    checkNearEqualToLinear pointAsList2d radius (xs, query)
+    checkInRadiusEqualToLinear pointAsList2d radius (xs, query)
 
 kNearestNeighborsLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> Int -> [(p, v)]
 kNearestNeighborsLinear pointAsList xs query k =

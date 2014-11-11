@@ -21,7 +21,7 @@ module Data.KdMap.Dynamic
        , batchInsert
          -- ** Query
        , nearestNeighbor
-       , nearNeighbors
+       , pointsInRadius
        , kNearestNeighbors
        , pointsInRange
        , assocs
@@ -157,6 +157,9 @@ insertPair t = uncurry (insert t)
 -- | Given a 'KdMap', a query point, and a number @k@, returns the
 -- @k@ point-value pairs with the nearest points to the query.
 --
+-- Neighbors are returned in order of increasing distance from query
+-- point.
+--
 -- Average time complexity: /log(k) * log^2(n)/ for /k/ nearest
 -- neighbors on a structure with /n/ data points.
 --
@@ -178,14 +181,18 @@ kNearestNeighbors (KdMap trees _ d2 _) k query =
 -- point-value pairs in the 'KdTree' with points within the given
 -- radius of the query point.
 --
+-- Points are not returned in any particular order.
+--
 -- Worst case time complexity: /O(n)/ for /n/ data points.
-nearNeighbors :: Real a => KdMap a p v -> a -> p -> [(p, v)]
-nearNeighbors (KdMap trees _ _ _) radius query =
-  L.concatMap (\t -> KDM.nearNeighbors t radius query) trees
+pointsInRadius :: Real a => KdMap a p v -> a -> p -> [(p, v)]
+pointsInRadius (KdMap trees _ _ _) radius query =
+  L.concatMap (\t -> KDM.pointsInRadius t radius query) trees
 
 -- | Finds all point-value pairs in a 'KdMap' with points within a
 -- given range, where the range is specified as a set of lower and
 -- upper bounds.
+--
+-- Points are not returned in any particular order.
 --
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
@@ -294,22 +301,34 @@ prop_kNearestEqualToBatch query =
     forAll (choose (1, length xs)) $ \k ->
       checkKNearestEqualToBatch pointAsList2d distSqr2d (xs, k, query)
 
-checkNearEqualToBatch :: (Ord p, Real a) => PointAsListFn a p ->
+checkInRadiusEqualToBatch :: (Ord p, Real a) => PointAsListFn a p ->
                                             SquaredDistanceFn a p ->
                                             ([p], a, p) ->
                                             Bool
-checkNearEqualToBatch p2l d2 (ps, radius, query) =
+checkInRadiusEqualToBatch p2l d2 (ps, radius, query) =
   let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
-      kdtAnswer = KDM.nearNeighbors kdt radius query
+      kdtAnswer = KDM.pointsInRadius kdt radius query
       dkdt = batchInsert (emptyKdMapWithDistFn p2l d2) $ testElements ps
-      dkdtAnswer = nearNeighbors dkdt radius query
+      dkdtAnswer = pointsInRadius dkdt radius query
   in  sort dkdtAnswer == sort kdtAnswer
 
-prop_checkNearEqualToBatch :: Point2d -> Property
-prop_checkNearEqualToBatch query =
+prop_checkInRadiusEqualToBatch :: Point2d -> Property
+prop_checkInRadiusEqualToBatch query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (0.0, 1000.0)) $ \radius ->
-      checkNearEqualToBatch pointAsList2d distSqr2d (xs, radius, query)
+      checkInRadiusEqualToBatch pointAsList2d distSqr2d (xs, radius, query)
+
+prop_checkInRangeEqualToBatch :: ([Point2d], Point2d, Point2d) -> Bool
+prop_checkInRangeEqualToBatch ([], _, _) = True
+prop_checkInRangeEqualToBatch (xs, lowers, uppers)
+  | L.all id $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
+      let kdt = KDM.buildKdMapWithDistFn pointAsList2d distSqr2d $ testElements xs
+          kdtAnswer = KDM.pointsInRange kdt lowers uppers
+          dkdt = batchInsert (emptyKdMapWithDistFn pointAsList2d distSqr2d) $ testElements xs
+          dkdtAnswer = pointsInRange dkdt lowers uppers
+      in  sort dkdtAnswer == sort kdtAnswer
+  | otherwise = True
+
 
 -- Run all tests
 return []

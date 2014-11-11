@@ -18,7 +18,7 @@ module Data.KdTree.Dynamic
        , insert
          -- ** Query
        , nearestNeighbor
-       , nearNeighbors
+       , pointsInRadius
        , kNearestNeighbors
        , pointsInRange
        , points
@@ -108,6 +108,9 @@ nearestNeighbor (KdTree dkdMap) = fst . DKDM.nearestNeighbor dkdMap
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
 -- @k@ nearest points in the 'KdTree' to the query point.
 --
+-- Neighbors are returned in order of increasing distance from query
+-- point.
+--
 -- Average time complexity: /log(k) * log^2(n)/ for /k/ nearest
 -- neighbors on a structure with /n/ data points.
 --
@@ -121,13 +124,17 @@ kNearestNeighbors (KdTree dkdMap) k query =
 -- points in the 'KdTree' that are within the given radius of the
 -- query points.
 --
+-- Points are not returned in any particular order.
+--
 -- Worst case time complexity: /O(n)/ for /n/ data points.
-nearNeighbors :: Real a => KdTree a p -> a -> p -> [p]
-nearNeighbors (KdTree dkdMap) radius query =
-  map fst $ DKDM.nearNeighbors dkdMap radius query
+pointsInRadius :: Real a => KdTree a p -> a -> p -> [p]
+pointsInRadius (KdTree dkdMap) radius query =
+  map fst $ DKDM.pointsInRadius dkdMap radius query
 
 -- | Finds all points in a 'KdTree' with points within a given range,
 -- where the range is specified as a set of lower and upper bounds.
+--
+-- Points are not returned in any particular order.
 --
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
