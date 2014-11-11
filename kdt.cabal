@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 name:                kdt
-version:             0.1.0.0
+version:             0.1.0
 synopsis:            Fast and flexible k-d trees for various types of point queries.
 description:         This package includes static and dynamic versions of k-d trees,
                      as well as \"Map\" variants that store data at each point in the
