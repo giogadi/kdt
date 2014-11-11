@@ -54,6 +54,30 @@ kNearestNeighborsLinear ps k query = reverse $ map snd $ Q.toList $ foldl' f Q.e
                                     else queue
                 in  insertBounded q (distSqr2d query p) p
 
+rangeLinear :: Point2d -> Point2d -> [Point2d] -> [Point2d]
+rangeLinear lowers uppers xs =
+  let lowersAsList = pointAsList2d lowers
+      uppersAsList = pointAsList2d uppers
+      valInRange l x u = l <= x && x <= u
+      pointInRange p =
+        and $ zipWith3 valInRange
+          lowersAsList (pointAsList2d p) uppersAsList
+  in  filter pointInRange xs
+
+pointToBounds :: Point2d -> Double -> (Point2d, Point2d)
+pointToBounds (Point2d x y) w =
+  (Point2d (x - w) (y - w), Point2d (x + w) (y + w))
+
+rangeOfPointLinear :: [Point2d] -> Double -> Point2d -> [Point2d]
+rangeOfPointLinear xs w q =
+  let (lowers, uppers) = pointToBounds q w
+  in  rangeLinear lowers uppers xs
+
+rangeOfPointKdt :: KDT.KdTree Double Point2d -> Double -> Point2d -> [Point2d]
+rangeOfPointKdt kdt w q =
+  let (lowers, uppers) = pointToBounds q w
+  in  KDT.pointsInRange kdt lowers uppers
+
 linearInterleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 linearInterleaveBuildQuery =
   let f :: ([Point2d], [Point2d]) -> (Point2d, Point2d) -> ([Point2d], [Point2d])
@@ -75,16 +99,22 @@ main =
           nf (map (KDT.nearestNeighbor (kdtN np))) (take nq queryPoints)
       inRadKdtBench nq r np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-r-" ++ show r) $
-          nf (concatMap (KDT.pointsInRadius (kdtN np) r)) (take nq queryPoints)
+          nf (map (KDT.pointsInRadius (kdtN np) r)) (take nq queryPoints)
       knnKdtBench nq k np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-k-" ++ show k) $
-          nf (concatMap (KDT.kNearestNeighbors (kdtN np) k)) (take nq queryPoints)
+          nf (map (KDT.kNearestNeighbors (kdtN np) k)) (take nq queryPoints)
+      rangeKdtBench nq w np =
+        bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-w-" ++ show w) $
+          nf (map $ rangeOfPointKdt (kdtN np) w) (take nq queryPoints)
       nnLinearBench nq np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq) $
           nf (map (nearestLinear (take np treePoints))) (take nq queryPoints)
       inRadLinearBench nq r np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-r-" ++ show r) $
           nf (map $ pointsInRadiusLinear (take np treePoints) r) (take nq queryPoints)
+      rangeLinearBench nq w np =
+        bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-w-" ++ show w) $
+          nf (map $ rangeOfPointLinear (take np treePoints) w) (take nq queryPoints)
       knnLinearBench nq k np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-k-" ++ show k) $
           nf (map $ kNearestNeighborsLinear (take np treePoints) k) (take nq queryPoints)
@@ -95,13 +125,16 @@ main =
       pointSetSizes = [100, 1000, 10000, 100000]
       radius = 0.05
       numNeighbors = 10
+      rangeWidth = 0.05
   in  defaultMain [
       bgroup "linear-nn" $ map (nnLinearBench numQueries) pointSetSizes,
       bgroup "linear-rad" $ map (inRadLinearBench numQueries radius) pointSetSizes,
       bgroup "linear-knn" $ map (knnLinearBench numQueries numNeighbors) pointSetSizes,
+      bgroup "linear-range" $ map (rangeLinearBench numQueries rangeWidth) pointSetSizes,
       bgroup "kdt-build" $ map buildKdtBench pointSetSizes,
       bgroup "kdt-nn" $ map (nnKdtBench numQueries) pointSetSizes,
       bgroup "kdt-rad" $ map (inRadKdtBench numQueries radius) pointSetSizes,
       bgroup "kdt-knn" $ map (knnKdtBench numQueries numNeighbors) pointSetSizes,
+      bgroup "kdt-range" $ map (rangeKdtBench numQueries rangeWidth) pointSetSizes,
       bgroup "dkdt-nn" $ map nniDkdtBench pointSetSizes
       ]
