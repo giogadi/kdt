@@ -248,6 +248,7 @@ pointsInRadius (KdTree t) radius query = map fst $ KDM.pointsInRadius t radius q
 --
 -- Neighbors are returned in order of increasing distance from query
 -- point.
+--
 -- Average time complexity: /log(k) * log(n)/ for /k/ nearest
 -- neighbors on a structure with /n/ data points.
 --

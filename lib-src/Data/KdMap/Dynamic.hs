@@ -321,7 +321,7 @@ prop_checkInRadiusEqualToBatch query =
 prop_checkInRangeEqualToBatch :: ([Point2d], Point2d, Point2d) -> Bool
 prop_checkInRangeEqualToBatch ([], _, _) = True
 prop_checkInRangeEqualToBatch (xs, lowers, uppers)
-  | L.all id $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
+  | L.and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
       let kdt = KDM.buildKdMapWithDistFn pointAsList2d distSqr2d $ testElements xs
           kdtAnswer = KDM.pointsInRange kdt lowers uppers
           dkdt = batchInsert (emptyKdMapWithDistFn pointAsList2d distSqr2d) $ testElements xs

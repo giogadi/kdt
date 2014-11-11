@@ -107,7 +107,7 @@ data KdMap a p v = KdMap { _pointAsList :: PointAsListFn a p
 instance (NFData a, NFData p, NFData v) => NFData (KdMap a p v) where rnf = genericRnf
 
 instance Functor (KdMap a p) where
-  fmap f kdMap = kdMap { _rootNode = (mapTreeNode f (_rootNode kdMap)) }
+  fmap f kdMap = kdMap { _rootNode = mapTreeNode f (_rootNode kdMap) }
 
 foldrTreeNode :: ((p, v) -> b -> b) -> b -> TreeNode a p v -> b
 foldrTreeNode _ z Empty = z
@@ -373,9 +373,8 @@ pointsInRange (KdMap pointAsList _ t _) lowers uppers =
           -- to ghc. Also, maybe only need to check previously
           -- unchecked axes?
           currentInRange =
-            L.all id $
-              zipWith3 valInRange
-                (pointAsList lowers) (pointAsList $ fst p) (pointAsList uppers)
+            L.and $ zipWith3 valInRange
+              (pointAsList lowers) (pointAsList $ fst p) (pointAsList uppers)
           accAfterCurrent = if currentInRange
                             then p : accAfterRight
                             else accAfterRight
@@ -495,13 +494,13 @@ rangeLinear pointAsList xs lowers uppers =
       lowersAsList = pointAsList lowers
       uppersAsList = pointAsList uppers
       pointInRange (p, _) =
-        L.all id $ zipWith3 valInRange (pointAsList p) lowersAsList uppersAsList
+        L.and $ zipWith3 valInRange (pointAsList p) lowersAsList uppersAsList
   in  filter pointInRange xs
 
 prop_rangeEqualToLinear :: ([Point2d], Point2d, Point2d) -> Bool
 prop_rangeEqualToLinear (xs, lowers, uppers)
   | null xs = True
-  | L.all id $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
+  | L.and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
       let linear = rangeLinear pointAsList2d (testElements xs) lowers uppers
           kdt    = buildKdMap pointAsList2d $ testElements xs
           kdtPoints = pointsInRange kdt lowers uppers
@@ -510,13 +509,13 @@ prop_rangeEqualToLinear (xs, lowers, uppers)
 
 prop_equalAxisValueSameElems :: Property
 prop_equalAxisValueSameElems =
-  forAll (listOf1 arbitrary) $ \xs@((Point2d x y) : _) ->
-    checkElements pointAsList2d $ (Point2d x (y + 1)) : xs
+  forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
+    checkElements pointAsList2d $ Point2d x (y + 1) : xs
 
 prop_equalAxisValueEqualToLinear :: Point2d -> Property
 prop_equalAxisValueEqualToLinear query =
-  forAll (listOf1 arbitrary) $ \xs@((Point2d x y) : _) ->
-    checkNearestEqualToLinear pointAsList2d (((Point2d x (y + 1)) : xs), query)
+  forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
+    checkNearestEqualToLinear pointAsList2d (Point2d x (y + 1) : xs, query)
 
 -- Run all tests
 return []
