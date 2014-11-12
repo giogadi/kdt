@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Data.KdMap.Static
        ( -- * Usage
@@ -27,7 +27,8 @@ module Data.KdMap.Static
        , foldrKdMap
          -- ** Utilities
        , defaultDistSqrFn
-       , runTests
+         -- ** Internal (for testing)
+       , isTreeValid
        ) where
 
 import Control.DeepSeq
@@ -36,15 +37,11 @@ import GHC.Generics
 
 import Control.Applicative
 import Data.Foldable
-import Data.Function
 import qualified Data.List as L
 import Data.Maybe
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
 import Data.Traversable
-import Test.QuickCheck
-
-import Data.Point2d
 
 -- $usage
 --
@@ -386,138 +383,17 @@ pointsInRange (KdMap pointAsList _ t _) lowers uppers =
 size :: KdMap a p v -> Int
 size (KdMap _ _ _ n) = n
 
---------------------------------------------------------------------------------
--- Tests
---------------------------------------------------------------------------------
-
-testElements :: [p] -> [(p, Int)]
-testElements ps = zip ps [0 ..]
-
-isTreeValid :: Real a => PointAsListFn a p -> Int -> TreeNode a p v -> Bool
-isTreeValid _ _ Empty = True
-isTreeValid pointAsList axis (TreeNode l (k, _) nodeAxisVal r) =
+isTreeNodeValid :: Real a => PointAsListFn a p -> Int -> TreeNode a p v -> Bool
+isTreeNodeValid _ _ Empty = True
+isTreeNodeValid pointAsList axis (TreeNode l (k, _) nodeAxisVal r) =
   let childrenAxisValues = map ((!! axis) . pointAsList . fst) . assocsInternal
       leftSubtreeLess = L.all (<= nodeAxisVal) $ childrenAxisValues l
       rightSubtreeGreater = L.all (> nodeAxisVal) $ childrenAxisValues r
       nextAxis = (axis + 1) `mod` length (pointAsList k)
   in  leftSubtreeLess && rightSubtreeGreater &&
-      isTreeValid pointAsList nextAxis l && isTreeValid pointAsList nextAxis r
+      isTreeNodeValid pointAsList nextAxis l && isTreeNodeValid pointAsList nextAxis r
 
-checkValidTree :: Real a => PointAsListFn a p -> [p] -> Bool
-checkValidTree pointAsList ps =
-  let (KdMap _ _ r _) = buildKdMap pointAsList $ testElements ps
-  in  isTreeValid pointAsList 0 r
-
-prop_validTree :: Property
-prop_validTree = forAll (listOf1 arbitrary) $ checkValidTree pointAsList2d
-
-checkElements :: (Ord p, Real a) => PointAsListFn a p -> [p] -> Bool
-checkElements pointAsList ps =
-  let kdt = buildKdMap pointAsList $ testElements ps
-  in  L.sort (assocs kdt) == L.sort (testElements ps)
-
-prop_sameElements :: Property
-prop_sameElements = forAll (listOf1 arbitrary) $ checkElements pointAsList2d
-
-checkNumElements :: Real a => PointAsListFn a p -> [p] -> Bool
-checkNumElements pointAsList ps =
-  let (KdMap _ _ _ n) = buildKdMap pointAsList $ testElements ps
-  in  n == length ps
-
-prop_validNumElements :: Property
-prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements pointAsList2d
-
-nearestNeighborLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> (p, v)
-nearestNeighborLinear pointAsList xs query =
-  L.minimumBy (compare `on` (defaultDistSqrFn pointAsList query . fst)) xs
-
-checkNearestEqualToLinear :: (Eq p, Real a) => PointAsListFn a p -> ([p], p) -> Bool
-checkNearestEqualToLinear pointAsList (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
-  in  nearestNeighbor kdt query == nearestNeighborLinear pointAsList (testElements ps) query
-
-prop_nearestEqualToLinear :: Point2d -> Property
-prop_nearestEqualToLinear query =
-  forAll (listOf1 arbitrary) $ \xs ->
-    checkNearestEqualToLinear pointAsList2d (xs, query)
-
-pointsInRadiusLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
-pointsInRadiusLinear pointAsList xs query radius =
-  filter ((<= radius * radius) . defaultDistSqrFn pointAsList query . fst) xs
-
-checkInRadiusEqualToLinear :: (Ord p, Real a) => PointAsListFn a p -> a -> ([p], p) -> Bool
-checkInRadiusEqualToLinear pointAsList radius (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
-      kdtNear = pointsInRadius kdt radius query
-      linearNear = pointsInRadiusLinear pointAsList (testElements ps) query radius
-  in  L.sort kdtNear == L.sort linearNear
-
-prop_inRadiusEqualToLinear :: Point2d -> Property
-prop_inRadiusEqualToLinear query =
-  forAll (listOf1 arbitrary) $ \xs ->
-    forAll (choose (0.0, 1000.0)) $ \radius ->
-    checkInRadiusEqualToLinear pointAsList2d radius (xs, query)
-
-kNearestNeighborsLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> Int -> [(p, v)]
-kNearestNeighborsLinear pointAsList xs query k =
-  take k $ L.sortBy (compare `on` (defaultDistSqrFn pointAsList query . fst)) xs
-
-checkKNearestEqualToLinear :: (Ord p, Real a) => PointAsListFn a p -> Int -> ([p], p) -> Bool
-checkKNearestEqualToLinear pointAsList k (xs, query) =
-  let kdt = buildKdMap pointAsList $ testElements xs
-      kdtKNear = kNearestNeighbors kdt k query
-      linearKNear = kNearestNeighborsLinear pointAsList (testElements xs) query k
-  in  kdtKNear == linearKNear
-
-prop_kNearestEqualToLinear :: Point2d -> Property
-prop_kNearestEqualToLinear query =
-  forAll (listOf1 arbitrary) $ \xs ->
-    forAll (choose (1, length xs)) $ \k ->
-      checkKNearestEqualToLinear pointAsList2d k (xs, query)
-
-checkKNearestSorted :: (Eq p, Real a) => PointAsListFn a p -> ([p], p) -> Bool
-checkKNearestSorted _ ([], _) = True
-checkKNearestSorted pointAsList (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
-      kNearestDists =
-        map (defaultDistSqrFn pointAsList query . fst) $ kNearestNeighbors kdt (length ps) query
-  in  kNearestDists == L.sort kNearestDists
-
-prop_kNearestSorted :: Point2d -> Property
-prop_kNearestSorted query =
-  forAll (listOf1 arbitrary) $ \xs ->
-    checkKNearestSorted pointAsList2d (xs, query)
-
-rangeLinear :: Real a => PointAsListFn a p -> [(p, v)] -> p -> p -> [(p, v)]
-rangeLinear pointAsList xs lowers uppers =
-  let valInRange a lower upper = lower <= a && a <= upper
-      lowersAsList = pointAsList lowers
-      uppersAsList = pointAsList uppers
-      pointInRange (p, _) =
-        L.and $ zipWith3 valInRange (pointAsList p) lowersAsList uppersAsList
-  in  filter pointInRange xs
-
-prop_rangeEqualToLinear :: ([Point2d], Point2d, Point2d) -> Bool
-prop_rangeEqualToLinear (xs, lowers, uppers)
-  | null xs = True
-  | L.and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
-      let linear = rangeLinear pointAsList2d (testElements xs) lowers uppers
-          kdt    = buildKdMap pointAsList2d $ testElements xs
-          kdtPoints = pointsInRange kdt lowers uppers
-      in  L.sort linear == L.sort kdtPoints
-  | otherwise = True
-
-prop_equalAxisValueSameElems :: Property
-prop_equalAxisValueSameElems =
-  forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
-    checkElements pointAsList2d $ Point2d x (y + 1) : xs
-
-prop_equalAxisValueEqualToLinear :: Point2d -> Property
-prop_equalAxisValueEqualToLinear query =
-  forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
-    checkNearestEqualToLinear pointAsList2d (Point2d x (y + 1) : xs, query)
-
--- Run all tests
-return []
-runTests :: IO Bool
-runTests = $quickCheckAll
+-- | Returns 'True' if tree structure adheres to k-d tree
+-- properties. For internal testing use.
+isTreeValid :: Real a => KdMap a p v -> Bool
+isTreeValid (KdMap pointAsList _ r _) = isTreeNodeValid pointAsList 0 r
