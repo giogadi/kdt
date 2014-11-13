@@ -78,7 +78,7 @@ data TreeNode a p v = TreeNode { _treeLeft :: TreeNode a p v
                                , _treeRight :: TreeNode a p v
                                } |
                       Empty
-  deriving Generic
+  deriving (Generic, Show, Read)
 instance (NFData a, NFData p, NFData v) => NFData (TreeNode a p v) where rnf = genericRnf
 
 mapTreeNode :: (v1 -> v2) -> TreeNode a p v1 -> TreeNode a p v2
@@ -103,6 +103,9 @@ data KdMap a p v = KdMap { _pointAsList :: PointAsListFn a p
                          , _size        :: Int
                          } deriving Generic
 instance (NFData a, NFData p, NFData v) => NFData (KdMap a p v) where rnf = genericRnf
+
+instance (Show a, Show p, Show v) => Show (KdMap a p v) where
+  show (KdMap _ _ rootNode _) = "KdMap " ++ show rootNode
 
 instance Functor (KdMap a p) where
   fmap f kdMap = kdMap { _rootNode = mapTreeNode f (_rootNode kdMap) }

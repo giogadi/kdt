@@ -182,6 +182,9 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultSqrDist)
 newtype KdTree a p = KdTree (KDM.KdMap a p ()) deriving Generic
 instance (NFData a, NFData p) => NFData (KdTree a p) where rnf = genericRnf
 
+instance (Show a, Show p) => Show (KdTree a p) where
+  show (KdTree kdm) = "KdTree " ++ show kdm
+
 instance F.Foldable (KdTree a) where
   foldr f z (KdTree kdMap) = KDM.foldrWithKey (f . fst) z kdMap
 

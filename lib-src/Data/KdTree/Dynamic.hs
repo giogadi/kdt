@@ -70,6 +70,9 @@ newtype KdTree a p = KdTree (DKDM.KdMap a p ())
 instance F.Foldable (KdTree a) where
   foldr f z (KdTree dkdMap) = DKDM.foldrWithKey (f . fst) z dkdMap
 
+instance (Show a, Show p) => Show (KdTree a p) where
+  show (KdTree kdm) = "KdTree " ++ show kdm
+
 -- | Generates an empty 'KdTree' with a user-specified distance function.
 emptyWithDist :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> KdTree a p
 emptyWithDist p2l d2 = KdTree $ DKDM.emptyWithDist p2l d2
