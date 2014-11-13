@@ -50,7 +50,7 @@ import Data.Traversable
 -- we'll refer to the points and their associated data as the /points/
 -- and /values/ of the 'KdMap', respectively. It might help to think
 -- of 'Data.KdTree.Static.KdTree' and 'KdMap' as being analogous to
--- 'Data.Set.Set' and 'Data.Map.Lazy.Map'.
+-- 'Set' and 'Map'.
 --
 -- Suppose you wanted to perform point queries on a set of 3D points,
 -- where each point is associated with a 'String'. Here's how to build
