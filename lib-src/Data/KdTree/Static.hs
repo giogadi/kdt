@@ -36,27 +36,27 @@ module Data.KdTree.Static
        , SquaredDistanceFn
        , KdTree
          -- ** /k/-d tree construction
-       , buildKdTree
-       , buildKdTreeWithDistFn
+       , build
+       , buildWithDist
          -- ** Query
-       , nearestNeighbor
-       , pointsInRadius
-       , kNearestNeighbors
-       , points
-       , pointsInRange
+       , nearest
+       , inRadius
+       , kNearest
+       , inRange
+       , toList
        , size
          -- ** Utilities
-       , defaultDistSqrFn
+       , defaultSqrDist
        ) where
 
 import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
-import Data.Foldable
+import qualified Data.Foldable as F
 
 import qualified Data.KdMap.Static as KDM
-import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
+import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultSqrDist)
 
 -- $intro
 --
@@ -100,11 +100,11 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- @
 -- >>> let dataPoints = [(Point3d 0.0 0.0 0.0), (Point3d 1.0 1.0 1.0)]
 --
--- >>> let kdt = 'buildKdTree' point3dAsList dataPoints
+-- >>> let kdt = 'build' point3dAsList dataPoints
 --
 -- >>> let queryPoint = Point3d 0.1 0.1 0.1
 --
--- >>> 'nearestNeighbor' kdt queryPoint
+-- >>> 'nearest' kdt queryPoint
 -- Point3d {x = 0.0, y = 0.0, z = 0.0}
 -- @
 
@@ -128,7 +128,7 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 --
 -- You may have noticed in the previous use case that we never
 -- specified what "nearest" means for our points. By default,
--- 'buildKdTree' uses a Euclidean distance function that is sufficient
+-- 'build' uses a Euclidean distance function that is sufficient
 -- in most cases. However, point queries are typically faster on a
 -- 'KdTree' built with a user-specified custom distance
 -- function. Let's generate a 'KdTree' using a custom distance
@@ -156,7 +156,7 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- We can build a 'KdTree' using our custom distance function as follows:
 --
 -- @
--- >>> let kdt = 'buildKdTreeWithDistFn' point3dAsList point3dSquaredDistance points
+-- >>> let kdt = 'buildWithDist' point3dAsList point3dSquaredDistance points
 -- @
 
 -- $axisvaluetypes
@@ -173,7 +173,7 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- point2iAsList (Point2i x y) = [x, y]
 --
 -- kdt :: [Point2i] -> KdTree Int Point2i
--- kdt dataPoints = buildKdTree point2iAsList dataPoints
+-- kdt dataPoints = 'build' point2iAsList dataPoints
 -- @
 
 -- | A /k/-d tree structure that stores points of type @p@ with axis
@@ -181,11 +181,11 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 newtype KdTree a p = KdTree (KDM.KdMap a p ()) deriving Generic
 instance (NFData a, NFData p) => NFData (KdTree a p) where rnf = genericRnf
 
-instance Foldable (KdTree a) where
-  foldr f z (KdTree kdMap) = KDM.foldrKdMap (f . fst) z kdMap
+instance F.Foldable (KdTree a) where
+  foldr f z (KdTree kdMap) = KDM.foldrWithKey (f . fst) z kdMap
 
 -- | Builds a 'KdTree' from a list of data points using a default
--- squared distance function 'defaultDistSqrFn'.
+-- squared distance function 'defaultSqrDist'.
 --
 -- Average complexity: /O(n * log(n))/ for /n/ data points.
 --
@@ -194,12 +194,12 @@ instance Foldable (KdTree a) where
 -- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
-buildKdTree :: Real a => PointAsListFn a p
-                         -> [p] -- ^ non-empty list of data points to be stored in the /k/-d tree
-                         -> KdTree a p
-buildKdTree _ [] = error "KdTree must be built with a non-empty list."
-buildKdTree pointAsList ps =
-  KdTree $ KDM.buildKdMap pointAsList $ zip ps $ repeat ()
+build :: Real a => PointAsListFn a p
+                   -> [p] -- ^ non-empty list of data points to be stored in the /k/-d tree
+                   -> KdTree a p
+build _ [] = error "KdTree must be built with a non-empty list."
+build pointAsList ps =
+  KdTree $ KDM.build pointAsList $ zip ps $ repeat ()
 
 -- | Builds a 'KdTree' from a list of data points using a
 -- user-specified squared distance function.
@@ -211,13 +211,13 @@ buildKdTree pointAsList ps =
 -- Worst case space complexity: /O(n)/ for /n/ data points.
 --
 -- Throws an error if given an empty list of data points.
-buildKdTreeWithDistFn :: Real a => PointAsListFn a p
-                                   -> SquaredDistanceFn a p
-                                   -> [p]
-                                   -> KdTree a p
-buildKdTreeWithDistFn _ _ [] = error "KdTree must be built with a non-empty list."
-buildKdTreeWithDistFn pointAsList distSqr ps =
-  KdTree $ KDM.buildKdMapWithDistFn pointAsList distSqr $ zip ps $ repeat ()
+buildWithDist :: Real a => PointAsListFn a p
+                           -> SquaredDistanceFn a p
+                           -> [p]
+                           -> KdTree a p
+buildWithDist _ _ [] = error "KdTree must be built with a non-empty list."
+buildWithDist pointAsList distSqr ps =
+  KdTree $ KDM.buildWithDist pointAsList distSqr $ zip ps $ repeat ()
 
 -- | Given a 'KdTree' and a query point, returns the nearest point
 -- in the 'KdTree' to the query point.
@@ -225,8 +225,8 @@ buildKdTreeWithDistFn pointAsList distSqr ps =
 -- Average time complexity: /O(log(n))/ for /n/ data points.
 --
 -- Worst case time complexity: /O(n)/ for /n/ data points.
-nearestNeighbor :: Real a => KdTree a p -> p -> p
-nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
+nearest :: Real a => KdTree a p -> p -> p
+nearest (KdTree t) query = fst $ KDM.nearest t query
 
 -- | Given a 'KdTree', a query point, and a radius, returns all
 -- points in the 'KdTree' that are within the given radius of the
@@ -236,12 +236,12 @@ nearestNeighbor (KdTree t) query = fst $ KDM.nearestNeighbor t query
 --
 -- Worst case time complexity: /O(n)/ for /n/ data points and
 -- a radius that subsumes all points in the structure.
-pointsInRadius :: Real a => KdTree a p
-                            -> a -- ^ radius
-                            -> p -- ^ query point
-                            -> [p] -- ^ list of points in tree with
-                                   -- given radius of query point
-pointsInRadius (KdTree t) radius query = map fst $ KDM.pointsInRadius t radius query
+inRadius :: Real a => KdTree a p
+                      -> a -- ^ radius
+                      -> p -- ^ query point
+                      -> [p] -- ^ list of points in tree with given
+                             -- radius of query point
+inRadius (KdTree t) radius query = map fst $ KDM.inRadius t radius query
 
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
 -- @k@ nearest points in the 'KdTree' to the query point.
@@ -254,8 +254,8 @@ pointsInRadius (KdTree t) radius query = map fst $ KDM.pointsInRadius t radius q
 --
 -- Worst case time complexity: /n * log(k)/ for /k/ nearest
 -- neighbors on a structure with /n/ data points.
-kNearestNeighbors :: Real a => KdTree a p -> Int -> p -> [p]
-kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
+kNearest :: Real a => KdTree a p -> Int -> p -> [p]
+kNearest (KdTree t) k query = map fst $ KDM.kNearest t k query
 
 -- | Finds all points in a 'KdTree' with points within a given range,
 -- where the range is specified as a set of lower and upper bounds.
@@ -264,17 +264,17 @@ kNearestNeighbors (KdTree t) k query = map fst $ KDM.kNearestNeighbors t k query
 --
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
-pointsInRange :: Real a => KdTree a p
-                           -> p -- ^ lower bounds of range
-                           -> p -- ^ upper bounds of range
-                           -> [p] -- ^ all points within given range
-pointsInRange (KdTree t) lower upper = map fst $ KDM.pointsInRange t lower upper
+inRange :: Real a => KdTree a p
+                     -> p -- ^ lower bounds of range
+                     -> p -- ^ upper bounds of range
+                     -> [p] -- ^ all points within given range
+inRange (KdTree t) lower upper = map fst $ KDM.inRange t lower upper
 
 -- | Returns a list of all the points in the 'KdTree'.
 --
 -- Time complexity: /O(n)/ for /n/ data points.
-points :: KdTree a p -> [p]
-points (KdTree t) = KDM.points t
+toList :: KdTree a p -> [p]
+toList (KdTree t) = KDM.keys t
 
 -- | Returns the number of elements in the 'KdTree'.
 --

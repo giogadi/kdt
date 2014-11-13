@@ -14,11 +14,11 @@ testElements ps = zip ps [0 ..]
 
 prop_validTree :: Property
 prop_validTree =
-  forAll (listOf1 arbitrary) $ isTreeValid . buildKdMap pointAsList2d . testElements
+  forAll (listOf1 arbitrary) $ isValid . build pointAsList2d . testElements
 
 checkElements :: (Ord p, Real a) => PointAsListFn a p -> [p] -> Bool
 checkElements pointAsList ps =
-  let kdt = buildKdMap pointAsList $ testElements ps
+  let kdt = build pointAsList $ testElements ps
   in  sort (assocs kdt) == sort (testElements ps)
 
 prop_sameElements :: Property
@@ -26,35 +26,35 @@ prop_sameElements = forAll (listOf1 arbitrary) $ checkElements pointAsList2d
 
 checkNumElements :: Real a => PointAsListFn a p -> [p] -> Bool
 checkNumElements pointAsList ps =
-  let kdm = buildKdMap pointAsList $ testElements ps
+  let kdm = build pointAsList $ testElements ps
   in  size kdm == length ps
 
 prop_validNumElements :: Property
 prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements pointAsList2d
 
-nearestNeighborLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> (p, v)
-nearestNeighborLinear pointAsList xs query =
-  minimumBy (comparing (KDM.defaultDistSqrFn pointAsList query . fst)) xs
+nearestLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> (p, v)
+nearestLinear pointAsList xs query =
+  minimumBy (comparing (KDM.defaultSqrDist pointAsList query . fst)) xs
 
 checkNearestEqualToLinear :: (Eq p, Real a) => KDM.PointAsListFn a p -> ([p], p) -> Bool
 checkNearestEqualToLinear pointAsList (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
-  in  nearestNeighbor kdt query == nearestNeighborLinear pointAsList (testElements ps) query
+  let kdt = build pointAsList $ testElements ps
+  in  nearest kdt query == nearestLinear pointAsList (testElements ps) query
 
 prop_nearestEqualToLinear :: Point2d -> Property
 prop_nearestEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkNearestEqualToLinear pointAsList2d (xs, query)
 
-pointsInRadiusLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
-pointsInRadiusLinear pointAsList xs query radius =
-  filter ((<= radius * radius) . defaultDistSqrFn pointAsList query . fst) xs
+inRadiusLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
+inRadiusLinear pointAsList xs query radius =
+  filter ((<= radius * radius) . defaultSqrDist pointAsList query . fst) xs
 
 checkInRadiusEqualToLinear :: (Ord p, Real a) => KDM.PointAsListFn a p -> a -> ([p], p) -> Bool
 checkInRadiusEqualToLinear pointAsList radius (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
-      kdtNear = pointsInRadius kdt radius query
-      linearNear = pointsInRadiusLinear pointAsList (testElements ps) query radius
+  let kdt = build pointAsList $ testElements ps
+      kdtNear = inRadius kdt radius query
+      linearNear = inRadiusLinear pointAsList (testElements ps) query radius
   in  sort kdtNear == sort linearNear
 
 prop_inRadiusEqualToLinear :: Point2d -> Property
@@ -63,15 +63,15 @@ prop_inRadiusEqualToLinear query =
     forAll (choose (0.0, 1000.0)) $ \radius ->
     checkInRadiusEqualToLinear pointAsList2d radius (xs, query)
 
-kNearestNeighborsLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> Int -> [(p, v)]
-kNearestNeighborsLinear pointAsList xs query k =
-  take k $ sortBy (comparing (defaultDistSqrFn pointAsList query . fst)) xs
+kNearestLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> Int -> [(p, v)]
+kNearestLinear pointAsList xs query k =
+  take k $ sortBy (comparing (defaultSqrDist pointAsList query . fst)) xs
 
 checkKNearestEqualToLinear :: (Ord p, Real a) => KDM.PointAsListFn a p -> Int -> ([p], p) -> Bool
 checkKNearestEqualToLinear pointAsList k (xs, query) =
-  let kdt = buildKdMap pointAsList $ testElements xs
-      kdtKNear = kNearestNeighbors kdt k query
-      linearKNear = kNearestNeighborsLinear pointAsList (testElements xs) query k
+  let kdt = build pointAsList $ testElements xs
+      kdtKNear = kNearest kdt k query
+      linearKNear = kNearestLinear pointAsList (testElements xs) query k
   in  kdtKNear == linearKNear
 
 prop_kNearestEqualToLinear :: Point2d -> Property
@@ -83,9 +83,9 @@ prop_kNearestEqualToLinear query =
 checkKNearestSorted :: (Eq p, Real a) => KDM.PointAsListFn a p -> ([p], p) -> Bool
 checkKNearestSorted _ ([], _) = True
 checkKNearestSorted pointAsList (ps, query) =
-  let kdt = buildKdMap pointAsList $ testElements ps
+  let kdt = build pointAsList $ testElements ps
       kNearestDists =
-        map (defaultDistSqrFn pointAsList query . fst) $ kNearestNeighbors kdt (length ps) query
+        map (defaultSqrDist pointAsList query . fst) $ kNearest kdt (length ps) query
   in  kNearestDists == sort kNearestDists
 
 prop_kNearestSorted :: Point2d -> Property
@@ -107,8 +107,8 @@ prop_rangeEqualToLinear (xs, lowers, uppers)
   | null xs = True
   | and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
       let linear = rangeLinear pointAsList2d (testElements xs) lowers uppers
-          kdt    = buildKdMap pointAsList2d $ testElements xs
-          kdtPoints = pointsInRange kdt lowers uppers
+          kdt    = build pointAsList2d $ testElements xs
+          kdtPoints = inRange kdt lowers uppers
       in  sort linear == sort kdtPoints
   | otherwise = True
 

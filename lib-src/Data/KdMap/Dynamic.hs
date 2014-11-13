@@ -12,35 +12,35 @@ module Data.KdMap.Dynamic
        , SquaredDistanceFn
        , KdMap
          -- ** Dynamic /k/-d map construction
-       , emptyKdMap
+       , empty
        , singleton
-       , emptyKdMapWithDistFn
-       , singletonWithDistFn
+       , emptyWithDist
+       , singletonWithDist
          -- ** Insertion
        , insert
        , insertPair
        , batchInsert
          -- ** Query
-       , nearestNeighbor
-       , pointsInRadius
-       , kNearestNeighbors
-       , pointsInRange
+       , nearest
+       , inRadius
+       , kNearest
+       , inRange
        , assocs
-       , points
-       , values
+       , keys
+       , elems
        , null
        , size
          -- ** Folds
-       , foldrKdMap
+       , foldrWithKey
          -- ** Utilities
-       , defaultDistSqrFn
+       , defaultSqrDist
          -- ** Internal (for testing)
        , subtreeSizes
        ) where
 
 import Prelude hiding (null)
 
-import Control.Applicative
+import Control.Applicative hiding (empty)
 import Data.Bits
 import Data.Foldable
 import Data.Function
@@ -53,7 +53,7 @@ import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
 import qualified Data.KdMap.Static as KDM
-import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
+import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultSqrDist)
 
 -- $usage
 --
@@ -67,16 +67,16 @@ import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultDistSqrFn)
 -- 'String's:
 --
 -- @
--- >>> let dkdm = singleton point3dAsList ((Point3D 0.0 0.0 0.0), \"First\")
+-- >>> let dkdm = 'singleton' point3dAsList ((Point3D 0.0 0.0 0.0), \"First\")
 --
--- >>> let dkdm' = insert dkdm ((Point3D 1.0 1.0 1.0), \"Second\")
+-- >>> let dkdm' = 'insert' dkdm ((Point3D 1.0 1.0 1.0), \"Second\")
 --
--- >>> nearestNeighbor dkdm' (Point3D 0.4 0.4 0.4)
+-- >>> 'nearest' dkdm' (Point3D 0.4 0.4 0.4)
 -- (Point3D {x = 0.0, y = 0.0, z = 0.0}, \"First\")
 --
--- >>> let dkdm'' = insert dkdm' ((Point3D 0.5 0.5 0.5), \"Third\")
+-- >>> let dkdm'' = 'insert' dkdm' ((Point3D 0.5 0.5 0.5), \"Third\")
 --
--- >>> nearestNeighbor dkdm'' (Point3D 0.4 0.4 0.4)
+-- >>> 'nearest' dkdm'' (Point3D 0.4 0.4 0.4)
 -- (Point3D {x = 0.5, y = 0.5, z = 0.5}, \"Third\")
 -- @
 
@@ -95,19 +95,19 @@ instance Functor (KdMap a p) where
   fmap f dkdMap = dkdMap { _trees = map (fmap f) $ _trees dkdMap }
 
 -- | Performs a foldr over each point-value pair in the 'KdMap'.
-foldrKdMap :: ((p, v) -> b -> b) -> b -> KdMap a p v -> b
-foldrKdMap f z dkdMap = L.foldr (flip $ KDM.foldrKdMap f) z $ _trees dkdMap
+foldrWithKey :: ((p, v) -> b -> b) -> b -> KdMap a p v -> b
+foldrWithKey f z dkdMap = L.foldr (flip $ KDM.foldrWithKey f) z $ _trees dkdMap
 
 instance Foldable (KdMap a p) where
-  foldr f = foldrKdMap (f . snd)
+  foldr f = foldrWithKey (f . snd)
 
 instance Traversable (KdMap a p) where
   traverse f (KdMap t p d n) =
     KdMap <$> traverse (traverse f) t <*> pure p <*> pure d <*> pure n
 
 -- | Generates an empty 'KdMap' with a user-specified distance function.
-emptyKdMapWithDistFn :: PointAsListFn a p -> SquaredDistanceFn a p -> KdMap a p v
-emptyKdMapWithDistFn p2l d2 = KdMap [] p2l d2 0
+emptyWithDist :: PointAsListFn a p -> SquaredDistanceFn a p -> KdMap a p v
+emptyWithDist p2l d2 = KdMap [] p2l d2 0
 
 -- | Returns whether the 'KdMap' is empty.
 null :: KdMap a p v -> Bool
@@ -116,18 +116,21 @@ null _ = False
 
 -- | Generates a 'KdMap' with a single point-value pair using a
 -- user-specified distance function.
-singletonWithDistFn :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> (p, v) -> KdMap a p v
-singletonWithDistFn p2l d2 (k, v) =
-  KdMap [KDM.buildKdMapWithDistFn p2l d2 [(k, v)]] p2l d2 1
+singletonWithDist :: Real a => PointAsListFn a p
+                               -> SquaredDistanceFn a p
+                               -> (p, v)
+                               -> KdMap a p v
+singletonWithDist p2l d2 (k, v) =
+  KdMap [KDM.buildWithDist p2l d2 [(k, v)]] p2l d2 1
 
 -- | Generates an empty 'KdMap' with the default distance function.
-emptyKdMap :: Real a => PointAsListFn a p -> KdMap a p v
-emptyKdMap p2l = emptyKdMapWithDistFn p2l $ defaultDistSqrFn p2l
+empty :: Real a => PointAsListFn a p -> KdMap a p v
+empty p2l = emptyWithDist p2l $ defaultSqrDist p2l
 
 -- | Generates a 'KdMap' with a single point-value pair using the
 -- default distance function.
 singleton :: Real a => PointAsListFn a p -> (p, v) -> KdMap a p v
-singleton p2l = singletonWithDistFn p2l $ defaultDistSqrFn p2l
+singleton p2l = singletonWithDist p2l $ defaultSqrDist p2l
 
 -- | Adds a given point-value pair to a 'KdMap'.
 --
@@ -137,22 +140,23 @@ insert (KdMap trees p2l d2 n) k v =
   let bitList = map ((1 .&.) . (n `shiftR`)) [0..]
       (onesPairs, theRestPairs) = span ((== 1) . fst) $ zip bitList trees
       ((_, ones), (_, theRest)) = (unzip onesPairs, unzip theRestPairs)
-      newTree = KDM.buildKdMapWithDistFn p2l d2  $ (k, v) : L.concatMap KDM.assocs ones
+      newTree = KDM.buildWithDist p2l d2  $ (k, v) : L.concatMap KDM.assocs ones
   in  KdMap (newTree : theRest) p2l d2 $ n + 1
+
+-- | Same as 'insert', but takes point and value as a pair.
+insertPair :: Real a => KdMap a p v -> (p, v) -> KdMap a p v
+insertPair t = uncurry (insert t)
 
 -- | Given a 'KdMap' and a query point, returns the point-value pair in
 -- the 'KdMap' with the point nearest to the query.
 --
 -- Average time complexity: /O(log^2(n))/.
-nearestNeighbor :: Real a => KdMap a p v -> p -> (p, v)
-nearestNeighbor (KdMap ts _ d2 _) query =
-  let nearests = map (`KDM.nearestNeighbor` query) ts
+nearest :: Real a => KdMap a p v -> p -> (p, v)
+nearest (KdMap ts _ d2 _) query =
+  let nearests = map (`KDM.nearest` query) ts
   in  if   Data.List.null nearests
-      then error "Called nearestNeighbor on empty KdMap."
+      then error "Called nearest on empty KdMap."
       else L.minimumBy (compare `on` (d2 query . fst)) nearests
-
-insertPair :: Real a => KdMap a p v -> (p, v) -> KdMap a p v
-insertPair t = uncurry (insert t)
 
 -- | Given a 'KdMap', a query point, and a number @k@, returns the
 -- @k@ point-value pairs with the nearest points to the query.
@@ -165,9 +169,9 @@ insertPair t = uncurry (insert t)
 --
 -- Worst case time complexity: /n * log(k)/ for /k/ nearest neighbors
 -- on a structure with /n/ data points.
-kNearestNeighbors :: Real a => KdMap a p v -> Int -> p -> [(p, v)]
-kNearestNeighbors (KdMap trees _ d2 _) k query =
-  let neighborSets = map (\t -> KDM.kNearestNeighbors t k query) trees
+kNearest :: Real a => KdMap a p v -> Int -> p -> [(p, v)]
+kNearest (KdMap trees _ d2 _) k query =
+  let neighborSets = map (\t -> KDM.kNearest t k query) trees
   in  take k $ L.foldr merge [] neighborSets
  where merge [] ys = ys
        merge xs [] = xs
@@ -184,9 +188,9 @@ kNearestNeighbors (KdMap trees _ d2 _) k query =
 -- Points are not returned in any particular order.
 --
 -- Worst case time complexity: /O(n)/ for /n/ data points.
-pointsInRadius :: Real a => KdMap a p v -> a -> p -> [(p, v)]
-pointsInRadius (KdMap trees _ _ _) radius query =
-  L.concatMap (\t -> KDM.pointsInRadius t radius query) trees
+inRadius :: Real a => KdMap a p v -> a -> p -> [(p, v)]
+inRadius (KdMap trees _ _ _) radius query =
+  L.concatMap (\t -> KDM.inRadius t radius query) trees
 
 -- | Finds all point-value pairs in a 'KdMap' with points within a
 -- given range, where the range is specified as a set of lower and
@@ -196,13 +200,13 @@ pointsInRadius (KdMap trees _ _ _) radius query =
 --
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
-pointsInRange :: Real a => KdMap a p v
-                           -> p -- ^ lower bounds of range
-                           -> p -- ^ upper bounds of range
-                           -> [(p, v)] -- ^ point-value pairs within
+inRange :: Real a => KdMap a p v
+                     -> p -- ^ lower bounds of range
+                     -> p -- ^ upper bounds of range
+                     -> [(p, v)] -- ^ point-value pairs within
                                        -- given range
-pointsInRange (KdMap trees _ _ _) lowers uppers =
-  L.concatMap (\t -> KDM.pointsInRange t lowers uppers) trees
+inRange (KdMap trees _ _ _) lowers uppers =
+  L.concatMap (\t -> KDM.inRange t lowers uppers) trees
 
 -- | Returns the number of elements in the 'KdMap'.
 --
@@ -219,19 +223,20 @@ assocs (KdMap trees _ _ _) = L.concatMap KDM.assocs trees
 -- | Returns all points in the 'KdMap'.
 --
 -- Time complexity: /O(n)/ for /n/ data points.
-points :: KdMap a p v -> [p]
-points = map fst . assocs
+keys :: KdMap a p v -> [p]
+keys = map fst . assocs
 
 -- | Returns all values in the 'KdMap'.
 --
 -- Time complexity: /O(n)/ for /n/ data points.
-values :: KdMap a p v -> [v]
-values = map snd . assocs
+elems :: KdMap a p v -> [v]
+elems = map snd . assocs
 
 -- | Inserts a list of point-value pairs into the 'KdMap'.
+--
+-- TODO: This will be made far more efficient than simply repeatedly
+-- inserting.
 batchInsert :: Real a => KdMap a p v -> [(p, v)] -> KdMap a p v
--- TODO: This can be made far more efficient by batch-creating the
--- individual KdMaps before placing them into the KdMap
 batchInsert =  L.foldl' insertPair
 
 -- | Returns size of each internal /k/-d tree that makes up the

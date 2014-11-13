@@ -25,9 +25,9 @@ interleaveBuildQuery =
            (DKDT.KdTree Double Point2d, [Point2d])
       f (kdt, accList) (treePt, queryPt) =
         let newKdt = DKDT.insert kdt treePt
-            nearest = DKDT.nearestNeighbor newKdt queryPt
-        in  (newKdt, nearest : accList)
-      start = (DKDT.emptyKdTreeWithDistFn pointAsList2d distSqr2d, [])
+            near = DKDT.nearest newKdt queryPt
+        in  (newKdt, near : accList)
+      start = (DKDT.emptyWithDist pointAsList2d distSqr2d, [])
   in  snd . foldl' f start
 
 -- nn implemented with optimized linear scan
@@ -76,33 +76,33 @@ rangeOfPointLinear xs w q =
 rangeOfPointKdt :: KDT.KdTree Double Point2d -> Double -> Point2d -> [Point2d]
 rangeOfPointKdt kdt w q =
   let (lowers, uppers) = pointToBounds q w
-  in  KDT.pointsInRange kdt lowers uppers
+  in  KDT.inRange kdt lowers uppers
 
 linearInterleaveBuildQuery :: [(Point2d, Point2d)] -> [Point2d]
 linearInterleaveBuildQuery =
   let f :: ([Point2d], [Point2d]) -> (Point2d, Point2d) -> ([Point2d], [Point2d])
       f (ps, accList) (structPt, queryPt) =
         let ps' = structPt : ps
-            nearest = nearestLinear ps' queryPt
-        in  (ps', nearest : accList)
+            near = nearestLinear ps' queryPt
+        in  (ps', near : accList)
   in  snd . foldl' f ([], [])
 
 main :: IO ()
 main =
   let seed = 1
       treePoints = CMR.evalRand (sequence $ repeat zeroOnePointSampler) $ pureMT seed
-      kdtN n = KDT.buildKdTreeWithDistFn pointAsList2d distSqr2d $ take n treePoints
+      kdtN n = KDT.buildWithDist pointAsList2d distSqr2d $ take n treePoints
       queryPoints = CMR.evalRand (sequence $ repeat zeroOnePointSampler) $ pureMT (seed + 1)
       buildKdtBench n = bench (show n) $ nf kdtN n
       nnKdtBench nq np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq) $
-          nf (map (KDT.nearestNeighbor (kdtN np))) (take nq queryPoints)
+          nf (map (KDT.nearest (kdtN np))) (take nq queryPoints)
       inRadKdtBench nq r np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-r-" ++ show r) $
-          nf (map (KDT.pointsInRadius (kdtN np) r)) (take nq queryPoints)
+          nf (map (KDT.inRadius (kdtN np) r)) (take nq queryPoints)
       knnKdtBench nq k np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-k-" ++ show k) $
-          nf (map (KDT.kNearestNeighbors (kdtN np) k)) (take nq queryPoints)
+          nf (map (KDT.kNearest (kdtN np) k)) (take nq queryPoints)
       rangeKdtBench nq w np =
         bench ("np-" ++ show np ++ "-nq-" ++ show nq ++ "-w-" ++ show w) $
           nf (map $ rangeOfPointKdt (kdtN np) w) (take nq queryPoints)

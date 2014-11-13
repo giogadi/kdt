@@ -16,7 +16,7 @@ testElements ps = zip ps [1 ..]
 checkLogNTrees :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> [p] -> Bool
 checkLogNTrees p2l d2 ps =
   let lengthIsLogN kdm = length (subtreeSizes kdm) == popCount (size kdm)
-  in  all lengthIsLogN $ scanl insertPair (emptyKdMapWithDistFn p2l d2) $ testElements ps
+  in  all lengthIsLogN $ scanl insertPair (emptyWithDist p2l d2) $ testElements ps
 
 prop_logNTrees :: [Point2d] -> Bool
 prop_logNTrees = checkLogNTrees pointAsList2d distSqr2d
@@ -27,7 +27,7 @@ checkTreeSizesPowerOf2 :: Real a => PointAsListFn a p ->
                                     Bool
 checkTreeSizesPowerOf2 p2l d2 ps =
   let sizesPowerOf2 = all ((== 1) . popCount) . subtreeSizes
-  in  all sizesPowerOf2 $ scanl insertPair (emptyKdMapWithDistFn p2l d2) $ testElements ps
+  in  all sizesPowerOf2 $ scanl insertPair (emptyWithDist p2l d2) $ testElements ps
 
 prop_treeSizesPowerOf2 :: [Point2d] -> Bool
 prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 pointAsList2d distSqr2d
@@ -35,7 +35,7 @@ prop_treeSizesPowerOf2 = checkTreeSizesPowerOf2 pointAsList2d distSqr2d
 checkNumElements :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> [p] -> Bool
 checkNumElements p2l d2 ps =
   let numsMatch (num, kdm) = size kdm == num && num == sum (subtreeSizes kdm)
-  in  all numsMatch $ zip [0..] $ scanl insertPair (emptyKdMapWithDistFn p2l d2) $ testElements ps
+  in  all numsMatch $ zip [0..] $ scanl insertPair (emptyWithDist p2l d2) $ testElements ps
 
 prop_validNumElements :: [Point2d] -> Bool
 prop_validNumElements = checkNumElements pointAsList2d distSqr2d
@@ -45,10 +45,10 @@ checkNearestEqualToBatch :: (Eq p, Real a) => PointAsListFn a p ->
                                               ([p], p) ->
                                               Bool
 checkNearestEqualToBatch p2l d2 (ps, query) =
-  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
-      kdtAnswer = KDM.nearestNeighbor kdt query
-      dkdt = batchInsert (emptyKdMapWithDistFn p2l d2) $ testElements ps
-      dkdtAnswer = nearestNeighbor dkdt query
+  let kdt = KDM.buildWithDist p2l d2 $ testElements ps
+      kdtAnswer = KDM.nearest kdt query
+      dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
+      dkdtAnswer = nearest dkdt query
   in  dkdtAnswer == kdtAnswer
 
 prop_nearestEqualToBatch :: Point2d -> Property
@@ -61,10 +61,10 @@ checkKNearestEqualToBatch :: (Eq p, Real a) => PointAsListFn a p ->
                                                ([p], Int, p) ->
                                                Bool
 checkKNearestEqualToBatch p2l d2 (ps, k, query) =
-  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
-      kdtAnswer = KDM.kNearestNeighbors kdt k query
-      dkdt = batchInsert (emptyKdMapWithDistFn p2l d2) $ testElements ps
-      dkdtAnswer = kNearestNeighbors dkdt k query
+  let kdt = KDM.buildWithDist p2l d2 $ testElements ps
+      kdtAnswer = KDM.kNearest kdt k query
+      dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
+      dkdtAnswer = kNearest dkdt k query
   in  dkdtAnswer == kdtAnswer
 
 prop_kNearestEqualToBatch :: Point2d -> Property
@@ -78,10 +78,10 @@ checkInRadiusEqualToBatch :: (Ord p, Real a) => PointAsListFn a p ->
                                             ([p], a, p) ->
                                             Bool
 checkInRadiusEqualToBatch p2l d2 (ps, radius, query) =
-  let kdt = KDM.buildKdMapWithDistFn p2l d2 $ testElements ps
-      kdtAnswer = KDM.pointsInRadius kdt radius query
-      dkdt = batchInsert (emptyKdMapWithDistFn p2l d2) $ testElements ps
-      dkdtAnswer = pointsInRadius dkdt radius query
+  let kdt = KDM.buildWithDist p2l d2 $ testElements ps
+      kdtAnswer = KDM.inRadius kdt radius query
+      dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
+      dkdtAnswer = inRadius dkdt radius query
   in  sort dkdtAnswer == sort kdtAnswer
 
 prop_checkInRadiusEqualToBatch :: Point2d -> Property
@@ -94,10 +94,10 @@ prop_checkInRangeEqualToBatch :: ([Point2d], Point2d, Point2d) -> Bool
 prop_checkInRangeEqualToBatch ([], _, _) = True
 prop_checkInRangeEqualToBatch (xs, lowers, uppers)
   | and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
-      let kdt = KDM.buildKdMapWithDistFn pointAsList2d distSqr2d $ testElements xs
-          kdtAnswer = KDM.pointsInRange kdt lowers uppers
-          dkdt = batchInsert (emptyKdMapWithDistFn pointAsList2d distSqr2d) $ testElements xs
-          dkdtAnswer = pointsInRange dkdt lowers uppers
+      let kdt = KDM.buildWithDist pointAsList2d distSqr2d $ testElements xs
+          kdtAnswer = KDM.inRange kdt lowers uppers
+          dkdt = batchInsert (emptyWithDist pointAsList2d distSqr2d) $ testElements xs
+          dkdtAnswer = inRange dkdt lowers uppers
       in  sort dkdtAnswer == sort kdtAnswer
   | otherwise = True
 
