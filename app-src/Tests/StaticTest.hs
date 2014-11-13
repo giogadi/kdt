@@ -104,7 +104,7 @@ rangeLinear pointAsList xs lowers uppers =
 
 prop_rangeEqualToLinear :: ([Point2d], Point2d, Point2d) -> Bool
 prop_rangeEqualToLinear (xs, lowers, uppers)
-  | null xs = True
+  | Data.List.null xs = True
   | and $ zipWith (<) (pointAsList2d lowers) (pointAsList2d uppers) =
       let linear = rangeLinear pointAsList2d (testElements xs) lowers uppers
           kdt    = build pointAsList2d $ testElements xs

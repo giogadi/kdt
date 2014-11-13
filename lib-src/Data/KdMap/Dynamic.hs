@@ -120,9 +120,9 @@ null _ = False
 -- | Generates a 'KdMap' with a single point-value pair using a
 -- user-specified distance function.
 singletonWithDist :: Real a => PointAsListFn a p
-                               -> SquaredDistanceFn a p
-                               -> (p, v)
-                               -> KdMap a p v
+                            -> SquaredDistanceFn a p
+                            -> (p, v)
+                            -> KdMap a p v
 singletonWithDist p2l d2 (k, v) =
   KdMap [KDM.buildWithDist p2l d2 [(k, v)]] p2l d2 1
 
@@ -204,10 +204,10 @@ inRadius (KdMap trees _ _ _) radius query =
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
 inRange :: Real a => KdMap a p v
-                     -> p -- ^ lower bounds of range
-                     -> p -- ^ upper bounds of range
-                     -> [(p, v)] -- ^ point-value pairs within
-                                       -- given range
+                  -> p -- ^ lower bounds of range
+                  -> p -- ^ upper bounds of range
+                  -> [(p, v)] -- ^ point-value pairs within given
+                              -- range
 inRange (KdMap trees _ _ _) lowers uppers =
   L.concatMap (\t -> KDM.inRange t lowers uppers) trees
 

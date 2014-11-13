@@ -36,6 +36,10 @@ module Data.KdTree.Static
        , SquaredDistanceFn
        , KdTree
          -- ** /k/-d tree construction
+       , empty
+       , emptyWithDist
+       , singleton
+       , singletonWithDist
        , build
        , buildWithDist
        , insertUnbalanced
@@ -45,6 +49,7 @@ module Data.KdTree.Static
        , kNearest
        , inRange
        , toList
+       , null
        , size
          -- ** Utilities
        , defaultSqrDist
@@ -55,6 +60,7 @@ import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
 import qualified Data.Foldable as F
+import Prelude hiding (null)
 
 import qualified Data.KdMap.Static as KDM
 import Data.KdMap.Static (PointAsListFn, SquaredDistanceFn, defaultSqrDist)
@@ -188,6 +194,32 @@ instance (Show a, Show p) => Show (KdTree a p) where
 instance F.Foldable (KdTree a) where
   foldr f z (KdTree kdMap) = KDM.foldrWithKey (f . fst) z kdMap
 
+-- | Builds an empty 'KdTree'.
+empty :: Real a => PointAsListFn a p -> KdTree a p
+empty = KdTree . KDM.empty
+
+-- | Builds an empty 'KdTree' using a user-specified squared distance
+-- function.
+emptyWithDist :: Real a => PointAsListFn a p
+                        -> SquaredDistanceFn a p
+                        -> KdTree a p
+emptyWithDist p2l d2 = KdTree $ KDM.emptyWithDist p2l d2
+
+-- | Builds a 'KdTree' with a single point.
+singleton :: Real a => PointAsListFn a p -> p -> KdTree a p
+singleton p2l p = KdTree $ KDM.singleton p2l (p, ())
+
+-- | Builds a 'KdTree' with a single point using a user-specified
+-- squared distance function.
+singletonWithDist :: Real a => PointAsListFn a p
+                            -> SquaredDistanceFn a p
+                            -> p
+                            -> KdTree a p
+singletonWithDist p2l d2 p = KdTree $ KDM.singletonWithDist p2l d2 (p, ())
+
+null :: KdTree a p -> Bool
+null (KdTree kdm) = KDM.null kdm
+
 -- | Builds a 'KdTree' from a list of data points using a default
 -- squared distance function 'defaultSqrDist'.
 --
@@ -196,12 +228,9 @@ instance F.Foldable (KdTree a) where
 -- Worst case time complexity: /O(n^2)/ for /n/ data points.
 --
 -- Worst case space complexity: /O(n)/ for /n/ data points.
---
--- Throws an error if given an empty list of data points.
 build :: Real a => PointAsListFn a p
                    -> [p] -- ^ non-empty list of data points to be stored in the /k/-d tree
                    -> KdTree a p
-build _ [] = error "KdTree must be built with a non-empty list."
 build pointAsList ps =
   KdTree $ KDM.build pointAsList $ zip ps $ repeat ()
 
@@ -213,13 +242,10 @@ build pointAsList ps =
 -- Worst case time complexity: /O(n^2)/ for /n/ data points.
 --
 -- Worst case space complexity: /O(n)/ for /n/ data points.
---
--- Throws an error if given an empty list of data points.
 buildWithDist :: Real a => PointAsListFn a p
-                           -> SquaredDistanceFn a p
-                           -> [p]
-                           -> KdTree a p
-buildWithDist _ _ [] = error "KdTree must be built with a non-empty list."
+                        -> SquaredDistanceFn a p
+                        -> [p]
+                        -> KdTree a p
 buildWithDist pointAsList distSqr ps =
   KdTree $ KDM.buildWithDist pointAsList distSqr $ zip ps $ repeat ()
 
@@ -242,8 +268,12 @@ insertUnbalanced (KdTree kdm) p = KdTree $ KDM.insertUnbalanced kdm (p, ())
 -- Average time complexity: /O(log(n))/ for /n/ data points.
 --
 -- Worst case time complexity: /O(n)/ for /n/ data points.
+--
+-- Throws an error if called on an empty 'KdTree'.
 nearest :: Real a => KdTree a p -> p -> p
-nearest (KdTree t) query = fst $ KDM.nearest t query
+nearest (KdTree t) query
+  | KDM.null t = error "Attempted to call nearest on an empty KdTree."
+  | otherwise = fst $ KDM.nearest t query
 
 -- | Given a 'KdTree', a query point, and a radius, returns all
 -- points in the 'KdTree' that are within the given radius of the
@@ -254,10 +284,10 @@ nearest (KdTree t) query = fst $ KDM.nearest t query
 -- Worst case time complexity: /O(n)/ for /n/ data points and
 -- a radius that subsumes all points in the structure.
 inRadius :: Real a => KdTree a p
-                      -> a -- ^ radius
-                      -> p -- ^ query point
-                      -> [p] -- ^ list of points in tree with given
-                             -- radius of query point
+                   -> a -- ^ radius
+                   -> p -- ^ query point
+                   -> [p] -- ^ list of points in tree with given
+                          -- radius of query point
 inRadius (KdTree t) radius query = map fst $ KDM.inRadius t radius query
 
 -- | Given a 'KdTree', a query point, and a number @k@, returns the
@@ -282,9 +312,9 @@ kNearest (KdTree t) k query = map fst $ KDM.kNearest t k query
 -- Worst case time complexity: /O(n)/ for n data points and a range
 -- that spans all the points.
 inRange :: Real a => KdTree a p
-                     -> p -- ^ lower bounds of range
-                     -> p -- ^ upper bounds of range
-                     -> [p] -- ^ all points within given range
+                  -> p -- ^ lower bounds of range
+                  -> p -- ^ upper bounds of range
+                  -> [p] -- ^ all points within given range
 inRange (KdTree t) lower upper = map fst $ KDM.inRange t lower upper
 
 -- | Returns a list of all the points in the 'KdTree'.

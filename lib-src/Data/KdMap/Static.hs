@@ -12,6 +12,10 @@ module Data.KdMap.Static
        , SquaredDistanceFn
        , KdMap
          -- ** /k/-d map construction
+       , empty
+       , emptyWithDist
+       , singleton
+       , singletonWithDist
        , build
        , buildWithDist
        , insertUnbalanced
@@ -23,6 +27,7 @@ module Data.KdMap.Static
        , assocs
        , keys
        , elems
+       , null
        , size
          -- ** Folds
        , foldrWithKey
@@ -36,8 +41,9 @@ import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
-import Control.Applicative
+import Control.Applicative hiding (empty)
 import Data.Foldable
+import Prelude hiding (null)
 import qualified Data.List as L
 import Data.Maybe
 import Data.Ord
@@ -137,6 +143,35 @@ instance Traversable (KdMap a p) where
   traverse f (KdMap p d r n) =
     KdMap <$> pure p <*> pure d <*> traverseTreeNode f r <*> pure n
 
+-- | Builds an empty 'KdMap'.
+empty :: Real a => PointAsListFn a p -> KdMap a p v
+empty p2l = emptyWithDist p2l (defaultSqrDist p2l)
+
+-- | Builds an empty 'KdMap' using a user-specified squared distance
+-- function.
+emptyWithDist :: Real a => PointAsListFn a p
+                        -> SquaredDistanceFn a p
+                        -> KdMap a p v
+emptyWithDist p2l d2 = KdMap p2l d2 Empty 0
+
+-- | Returns 'True' if the given 'KdMap' is empty.
+null :: KdMap a p v -> Bool
+null kdm = _size kdm == 0
+
+-- | Builds a 'KdMap' with a single point-value pair and a
+-- user-specified squared distance function.
+singletonWithDist :: Real a => PointAsListFn a p
+                            -> SquaredDistanceFn a p
+                            -> (p, v)
+                            -> KdMap a p v
+singletonWithDist p2l d2 (p, v) =
+  let singletonTreeNode = TreeNode Empty (p, v) (head $ p2l p) Empty
+  in  KdMap p2l d2 singletonTreeNode 1
+
+-- | Builds a 'KdMap' with a single point-value pair.
+singleton :: Real a => PointAsListFn a p -> (p, v) -> KdMap a p v
+singleton p2l (p, v) = singletonWithDist p2l (defaultSqrDist p2l) (p, v)
+
 quickselect :: (b -> b -> Ordering) -> Int -> [b] -> b
 quickselect cmp = go
   where go _ [] = error "quickselect must be called on a non-empty list."
@@ -155,13 +190,11 @@ quickselect cmp = go
 -- Worst case time complexity: /O(n^2)/ for /n/ data points.
 --
 -- Worst case space complexity: /O(n)/ for /n/ data points.
---
--- Throws an error if given an empty list of data points.
-buildWithDist :: Real a => PointAsListFn a p ->
-                 SquaredDistanceFn a p ->
-                 [(p, v)] ->
-                 KdMap a p v
-buildWithDist _ _ [] = error "KdMap must be built with a non-empty list."
+buildWithDist :: Real a => PointAsListFn a p
+                        -> SquaredDistanceFn a p
+                        -> [(p, v)]
+                        -> KdMap a p v
+buildWithDist p2l d2 [] = emptyWithDist p2l d2
 buildWithDist pointAsList distSqr dataPoints =
   let axisValsPointsPairs = zip (map (cycle . pointAsList . fst) dataPoints) dataPoints
   in  KdMap { _pointAsList = pointAsList
@@ -205,8 +238,6 @@ defaultSqrDist pointAsList k1 k2 =
 -- Worst case time complexity: /O(n^2)/ for /n/ data points.
 --
 -- Worst case space complexity: /O(n)/ for /n/ data points.
---
--- Throws an error if given an empty list of data points.
 build :: Real a => PointAsListFn a p -> [(p, v)] -> KdMap a p v
 build pointAsList =
   buildWithDist pointAsList $ defaultSqrDist pointAsList
@@ -260,9 +291,11 @@ elems = map snd . assocs
 -- Average time complexity: /O(log(n))/ for /n/ data points.
 --
 -- Worst case time complexity: /O(n)/ for /n/ data points.
+--
+-- Throws error if called on an empty 'KdMap'.
 nearest :: Real a => KdMap a p v -> p -> (p, v)
 nearest (KdMap _ _ Empty _) _ =
-  error "nearest: why is there an empty KdMap?"
+  error "Attempted to call nearest on an empty KdMap."
 nearest (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
   -- This is an ugly way to kickstart the function but it's faster
   -- than using a Maybe.
@@ -298,11 +331,10 @@ nearest (KdMap pointAsList distSqr t@(TreeNode _ root _ _) _) query =
 -- Worst case time complexity: /O(n)/ for /n/ data points and a radius
 -- that spans all points in the structure.
 inRadius :: Real a => KdMap a p v
-                      -> a -- ^ radius
-                      -> p -- ^ query point
-                      -> [(p, v)] -- ^ list of point-value pairs with
-                                  -- points within given radius of
-                                  -- query
+                   -> a -- ^ radius
+                   -> p -- ^ query point
+                   -> [(p, v)] -- ^ list of point-value pairs with
+                               -- points within given radius of query
 inRadius (KdMap pointAsList distSqr t _) radius query =
   go (cycle $ pointAsList query) t []
   where
@@ -373,10 +405,10 @@ kNearest (KdMap pointAsList distSqr t _) numNeighbors query =
 -- automatically count whole portions of tree as being within given
 -- range.
 inRange :: Real a => KdMap a p v
-                     -> p -- ^ lower bounds of range
-                     -> p -- ^ upper bounds of range
-                     -> [(p, v)] -- ^ point-value pairs within given
-                                 -- range
+                  -> p -- ^ lower bounds of range
+                  -> p -- ^ upper bounds of range
+                  -> [(p, v)] -- ^ point-value pairs within given
+                              -- range
 inRange (KdMap pointAsList _ t _) lowers uppers =
   go (cycle (pointAsList lowers) `zip` cycle (pointAsList uppers)) t []
   where

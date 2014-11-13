@@ -87,7 +87,10 @@ null (KdTree dkdMap) = DKDM.null dkdMap
 
 -- | Generates a 'KdTree' with a single point using a
 -- user-specified distance function.
-singletonWithDist :: Real a => PointAsListFn a p -> SquaredDistanceFn a p -> p -> KdTree a p
+singletonWithDist :: Real a => PointAsListFn a p
+                            -> SquaredDistanceFn a p
+                            -> p
+                            -> KdTree a p
 singletonWithDist p2l d2 p = KdTree $ DKDM.singletonWithDist p2l d2 (p, ())
 
 -- | Generates a 'KdTree' with a single point using the default
