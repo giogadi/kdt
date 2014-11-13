@@ -38,6 +38,7 @@ module Data.KdTree.Static
          -- ** /k/-d tree construction
        , build
        , buildWithDist
+       , insertUnbalanced
          -- ** Query
        , nearest
        , inRadius
@@ -218,6 +219,19 @@ buildWithDist :: Real a => PointAsListFn a p
 buildWithDist _ _ [] = error "KdTree must be built with a non-empty list."
 buildWithDist pointAsList distSqr ps =
   KdTree $ KDM.buildWithDist pointAsList distSqr $ zip ps $ repeat ()
+
+-- | Inserts a point into a 'KdTree'. This can potentially
+-- cause the internal tree structure to become unbalanced. If the tree
+-- becomes too unbalanced, point queries will be very inefficient. If
+-- you need to perform lots of point insertions on an already existing
+-- /k/-d tree, check out
+-- @Data.KdTree.Dynamic.@'Data.KdTree.Dynamic.KdTree'.
+--
+-- Average complexity: /O(log(n))/ for /n/ data points.
+--
+-- Worse case time complexity: /O(n)/ for /n/ data points.
+insertUnbalanced :: Real a => KdTree a p -> p -> KdTree a p
+insertUnbalanced (KdTree kdm) p = KdTree $ KDM.insertUnbalanced kdm (p, ())
 
 -- | Given a 'KdTree' and a query point, returns the nearest point
 -- in the 'KdTree' to the query point.

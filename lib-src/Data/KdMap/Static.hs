@@ -14,6 +14,7 @@ module Data.KdMap.Static
          -- ** /k/-d map construction
        , build
        , buildWithDist
+       , insertUnbalanced
          -- ** Query
        , nearest
        , inRadius
@@ -206,6 +207,26 @@ defaultSqrDist pointAsList k1 k2 =
 build :: Real a => PointAsListFn a p -> [(p, v)] -> KdMap a p v
 build pointAsList =
   buildWithDist pointAsList $ defaultSqrDist pointAsList
+
+-- | Inserts a point-value pair into a 'KdMap'. This can potentially
+-- cause the internal tree structure to become unbalanced. If the tree
+-- becomes too unbalanced, point queries will be very inefficient. If
+-- you need to perform lots of point insertions on an already existing
+-- /k/-d map, check out
+-- @Data.KdMap.Dynamic.@'Data.KdMap.Dynamic.KdMap'.
+--
+-- Average complexity: /O(log(n))/ for /n/ data points.
+--
+-- Worse case time complexity: /O(n)/ for /n/ data points.
+insertUnbalanced :: Real a => KdMap a p v -> (p, v) -> KdMap a p v
+insertUnbalanced kdm@(KdMap pointAsList _ rootNode n) (p', v') =
+  kdm { _rootNode = go rootNode (cycle $ pointAsList p'), _size = n + 1 }
+  where
+    go _ [] = error "insertUnbalanced.go: no empty lists allowed!"
+    go Empty (axisValue' : _) = TreeNode Empty (p', v') axisValue' Empty
+    go t@(TreeNode left _ nodeAxisValue right) (axisValue' : nextAxisValues)
+      | axisValue' <= nodeAxisValue = t { _treeLeft = go left nextAxisValues }
+      | otherwise = t { _treeRight = go right nextAxisValues }
 
 assocsInternal :: TreeNode a p v -> [(p, v)]
 assocsInternal t = go t []
