@@ -19,6 +19,7 @@ module Data.KdMap.Static
        , build
        , buildWithDist
        , insertUnbalanced
+       , batchInsertUnbalanced
          -- ** Query
        , nearest
        , inRadius
@@ -251,9 +252,9 @@ build pointAsList =
 --
 -- Average complexity: /O(log(n))/ for /n/ data points.
 --
--- Worse case time complexity: /O(n)/ for /n/ data points.
-insertUnbalanced :: Real a => KdMap a p v -> (p, v) -> KdMap a p v
-insertUnbalanced kdm@(KdMap pointAsList _ rootNode n) (p', v') =
+-- Worst case time complexity: /O(n)/ for /n/ data points.
+insertUnbalanced :: Real a => KdMap a p v -> p -> v -> KdMap a p v
+insertUnbalanced kdm@(KdMap pointAsList _ rootNode n) p' v' =
   kdm { _rootNode = go rootNode (cycle $ pointAsList p'), _size = n + 1 }
   where
     go _ [] = error "insertUnbalanced.go: no empty lists allowed!"
@@ -261,6 +262,16 @@ insertUnbalanced kdm@(KdMap pointAsList _ rootNode n) (p', v') =
     go t@(TreeNode left _ nodeAxisValue right) (axisValue' : nextAxisValues)
       | axisValue' <= nodeAxisValue = t { _treeLeft = go left nextAxisValues }
       | otherwise = t { _treeRight = go right nextAxisValues }
+
+-- | Inserts a list of point-value pairs into a 'KdMap'. This can
+-- potentially cause the internal tree structure to become unbalanced,
+-- which leads to inefficient point queries.
+--
+-- Average complexity: /O(n * log(n))/ for /n/ data points.
+--
+-- Worst case time complexity: /O(n^2)/ for /n/ data points.
+batchInsertUnbalanced :: Real a => KdMap a p v -> [(p, v)] -> KdMap a p v
+batchInsertUnbalanced = foldl' $ \kdm (p, v) -> insertUnbalanced kdm p v
 
 assocsInternal :: TreeNode a p v -> [(p, v)]
 assocsInternal t = go t []

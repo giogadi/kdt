@@ -122,6 +122,17 @@ prop_equalAxisValueEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
     checkNearestEqualToLinear pointAsList2d (Point2d x (y + 1) : xs, query)
 
+prop_unbalancedInsertValid :: Property
+prop_unbalancedInsertValid =
+  forAll (listOf1 arbitrary) $
+    isValid . batchInsertUnbalanced (empty pointAsList2d) . testElements
+
+prop_unbalancedInsertNNEqualToLinear :: Point2d -> Property
+prop_unbalancedInsertNNEqualToLinear query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    let kdm = batchInsertUnbalanced (empty pointAsList2d) $ testElements xs
+    in  nearest kdm query == nearestLinear pointAsList2d (testElements xs) query
+
 -- Run all tests
 return []
 runTests :: IO Bool
