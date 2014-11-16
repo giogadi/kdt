@@ -92,7 +92,7 @@ data KdMap a p v = KdMap
 instance (NFData a, NFData p, NFData v) => NFData (KdMap a p v) where rnf = genericRnf
 
 instance (Show a, Show p, Show v) => Show (KdMap a p v) where
-  show kdm = "KdMap " ++ (show $ _trees kdm)
+  show kdm = "KdMap " ++ show (_trees kdm)
 
 instance Functor (KdMap a p) where
   fmap f dkdMap = dkdMap { _trees = map (fmap f) $ _trees dkdMap }
