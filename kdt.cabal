@@ -45,6 +45,7 @@ library
 Test-Suite StaticTest
   type:                 exitcode-stdio-1.0
   main-is:              Tests/StaticTest.hs
+  other-modules:        Data.Point2d
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
   build-depends:        base >=4.6 && <4.8,
@@ -57,6 +58,7 @@ Test-Suite StaticTest
 Test-Suite DynamicTest
   type:                 exitcode-stdio-1.0
   main-is:              Tests/DynamicTest.hs
+  other-modules:        Data.Point2d
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
   build-depends:        base >=4.6 && <4.8,
@@ -69,6 +71,7 @@ Test-Suite DynamicTest
 benchmark KDTBenchmark
   type:                 exitcode-stdio-1.0
   main-is:              Benchmarks/KDTBenchmark.hs
+  other-modules:        Data.Point2d
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
   ghc-prof-options:     -Wall -O3 -fprof-auto
