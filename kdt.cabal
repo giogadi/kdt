@@ -75,7 +75,7 @@ benchmark KDTBenchmark
                         "-with-rtsopts=-p"
   build-depends:        base >=4.6 && <4.8,
                         kdt -any,
-                        MonadRandom >= 0.1.12 && <0.2,
+                        MonadRandom >= 0.1.12 && <0.4,
                         mersenne-random-pure64 >=0.2.0.4 && <0.3,
                         criterion >= 1.0.0.0 && <1.1,
                         pqueue >=1.2.1 && <1.3,
