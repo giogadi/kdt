@@ -9,6 +9,8 @@ import Data.List
 import Data.Point2d
 import System.Exit
 import Test.QuickCheck
+-- This import only required for QuickCheck <2.7
+import Test.QuickCheck.All
 
 testElements :: [p] -> [(p, Int)]
 testElements ps = zip ps [1 ..]
