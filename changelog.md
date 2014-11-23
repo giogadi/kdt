@@ -1,3 +1,6 @@
+# 0.2.2
+* Relax lower version bound on QuickCheck to 2.5.
+
 # 0.2.1
 * Relax upper version constraint for MonadRandom (benchmarking code)
 * Add Data.Point2d as dependency of executables so tests and benchmarks can be built from the archive downloaded on Hackage.
