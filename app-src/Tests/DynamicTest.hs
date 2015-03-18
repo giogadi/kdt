@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, CPP #-}
 
 import qualified Data.KdMap.Static as KDM
 import Data.KdMap.Dynamic
@@ -9,8 +9,11 @@ import Data.List
 import Data.Point2d
 import System.Exit
 import Test.QuickCheck
--- This import only required for QuickCheck <2.7
+
+#if MIN_VERSION_QuickCheck(2,7,0)
+#else
 import Test.QuickCheck.All
+#endif
 
 testElements :: [p] -> [(p, Int)]
 testElements ps = zip ps [1 ..]

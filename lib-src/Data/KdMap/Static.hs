@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, CPP #-}
 
 module Data.KdMap.Static
        ( -- * Usage
@@ -43,13 +43,19 @@ import Control.DeepSeq.Generics (genericRnf)
 import GHC.Generics
 
 import Control.Applicative hiding (empty)
+
+#if MIN_VERSION_base(4,8,0)
+import Data.Foldable hiding (null)
+#else
 import Data.Foldable
+import Data.Traversable
+#endif
+
 import Prelude hiding (null)
 import qualified Data.List as L
 import Data.Maybe
 import Data.Ord
 import qualified Data.PQueue.Prio.Max as Q
-import Data.Traversable
 
 -- $usage
 --

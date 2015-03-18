@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, CPP #-}
 
 module Data.KdMap.Dynamic
        ( -- * Usage
@@ -40,13 +40,17 @@ module Data.KdMap.Dynamic
 
 import Prelude hiding (null)
 
+#if MIN_VERSION_base(4,8,0)
+#else
 import Control.Applicative hiding (empty)
-import Data.Bits
 import Data.Foldable
+import Data.Traversable
+#endif
+
+import Data.Bits
 import Data.Function
 import Data.List as L hiding (insert, null)
 import qualified Data.List (null)
-import Data.Traversable
 
 import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
