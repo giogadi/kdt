@@ -1,3 +1,6 @@
+# 0.2.3
+* For internal priority queue implementation, use the heap library instead of pqueue library in order to build on ghc 7.10.
+
 # 0.2.2
 * Relax lower version bound on QuickCheck to 2.5.
 
