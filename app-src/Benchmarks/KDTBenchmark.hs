@@ -1,12 +1,16 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 import Data.Point2d
 import Data.KdTree.Static as KDT
 import Data.KdTree.Dynamic as DKDT
 
+import Control.DeepSeq
 import Control.Monad
 import qualified Control.Monad.Random as CMR
 import Criterion.Main
 import Data.List
-import qualified Data.PQueue.Prio.Max as Q
+import Data.Maybe
+import qualified Data.Heap as Q
 import System.Random.Mersenne.Pure64
 
 zeroOnePointSampler :: CMR.Rand PureMT Point2d
@@ -46,12 +50,15 @@ pointsInRadiusLinear ps radius query =
 
 -- knn implemented with priority queue
 kNearestNeighborsLinear :: [Point2d] -> Int -> Point2d -> [Point2d]
-kNearestNeighborsLinear ps k query = reverse $ map snd $ Q.toList $ foldl' f Q.empty ps
+kNearestNeighborsLinear ps k query =
+  reverse $ map snd $ Q.toAscList $ foldl' f (Q.empty :: Q.MaxPrioHeap Double Point2d) ps
   where f q p = let insertBounded queue dist x
-                      | Q.size queue < k = Q.insert dist x queue
-                      | otherwise = if dist < fst (Q.findMax queue)
-                                    then Q.insert dist x $ Q.deleteMax queue
-                                    else queue
+                      | Q.size queue < k = Q.insert (dist, x) queue
+                      | otherwise =
+                        let ((farthestDist, _), rest) = fromJust $ Q.view queue
+                        in  if dist < farthestDist
+                            then Q.insert (dist, x) rest
+                            else queue
                 in  insertBounded q (distSqr2d query p) p
 
 rangeLinear :: Point2d -> Point2d -> [Point2d] -> [Point2d]

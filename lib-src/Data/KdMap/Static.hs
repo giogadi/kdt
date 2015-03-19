@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, CPP #-}
+{-# LANGUAGE DeriveGeneric, CPP, FlexibleContexts #-}
 
 module Data.KdMap.Static
        ( -- * Usage
@@ -55,7 +55,7 @@ import Prelude hiding (null)
 import qualified Data.List as L
 import Data.Maybe
 import Data.Ord
-import qualified Data.PQueue.Prio.Max as Q
+import qualified Data.Heap as Q
 
 -- $usage
 --
@@ -385,23 +385,26 @@ inRadius (KdMap pointAsList distSqr t _) radius query =
 -- neighbors on a structure with /n/ data points.
 kNearest :: Real a => KdMap a p v -> Int -> p -> [(p, v)]
 kNearest (KdMap pointAsList distSqr t _) numNeighbors query =
-  reverse $ map snd $ Q.toList $ go (cycle $ pointAsList query) Q.empty t
+  reverse $ map snd $ Q.toAscList $ go (cycle $ pointAsList query)
+    (Q.empty :: Q.MaxPrioHeap a (p,v)) t
   where
-    -- go :: [Double] -> Q.MaxPQueue Double (p, d) -> TreeNode p d -> KQueue p d
+    -- go :: [a] -> Q.MaxPrioHeap a (p, v) -> TreeNode a p v -> Q.MaxPrioHeap a (p, v)
     go [] _ _ = error "kNearest.go: no empty lists allowed!"
     go _ q Empty = q
     go (queryAxisValue : qvs) q (TreeNode left (k, v) nodeAxisVal right) =
       let insertBounded queue dist x
-            | Q.size queue < numNeighbors = Q.insert dist x queue
-            | otherwise = if dist < fst (Q.findMax queue)
-                          then Q.insert dist x $ Q.deleteMax queue
-                          else queue
+            | Q.size queue < numNeighbors = Q.insert (dist, x) queue
+            | otherwise = let ((farthestDist, _), rest) = fromJust $ Q.view queue
+                          in  if dist < farthestDist
+                              then Q.insert (dist, x) rest
+                              else queue
           q' = insertBounded q (distSqr k query) (k, v)
           kNear queue onsideSubtree offsideSubtree =
             let queue' = go qvs queue onsideSubtree
                 checkOffsideTree =
                   Q.size queue' < numNeighbors ||
-                  (queryAxisValue - nodeAxisVal)^(2 :: Int) < fst (Q.findMax queue')
+                  (queryAxisValue - nodeAxisVal)^(2 :: Int) <
+                    (fst . fst) (fromJust $ Q.view queue')
             in  if checkOffsideTree
                 then go qvs queue' offsideSubtree
                 else queue'
