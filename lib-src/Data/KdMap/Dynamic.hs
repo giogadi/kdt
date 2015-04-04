@@ -244,7 +244,7 @@ elems = map snd . assocs
 -- TODO: This will be made far more efficient than simply repeatedly
 -- inserting.
 batchInsert :: Real a => KdMap a p v -> [(p, v)] -> KdMap a p v
-batchInsert =  L.foldl' insertPair
+batchInsert = L.foldl' insertPair
 
 -- | Returns size of each internal /k/-d tree that makes up the
 -- dynamic structure. For internal testing use.
