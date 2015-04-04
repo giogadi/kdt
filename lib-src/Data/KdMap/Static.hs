@@ -57,6 +57,8 @@ import Data.Maybe
 import Data.Ord
 import qualified Data.Heap as Q
 
+import Data.Internal (quickselect)
+
 -- $usage
 --
 -- The 'KdMap' is a variant of 'Data.KdTree.Static.KdTree' where each point in
@@ -178,15 +180,6 @@ singletonWithDist p2l d2 (p, v) =
 -- | Builds a 'KdMap' with a single point-value pair.
 singleton :: Real a => PointAsListFn a p -> (p, v) -> KdMap a p v
 singleton p2l (p, v) = singletonWithDist p2l (defaultSqrDist p2l) (p, v)
-
-quickselect :: (b -> b -> Ordering) -> Int -> [b] -> b
-quickselect cmp = go
-  where go _ [] = error "quickselect must be called on a non-empty list."
-        go k (x:xs) | k < l = go k ys
-                    | k > l = go (k - l - 1) zs
-                    | otherwise = x
-          where (ys, zs) = L.partition ((== LT) . (`cmp` x)) xs
-                l = length ys
 
 -- | Builds a 'KdMap' from a list of pairs of points (of type p) and
 -- values (of type v), using a user-specified squared distance

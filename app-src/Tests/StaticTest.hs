@@ -5,7 +5,6 @@ import Data.KdMap.Static as KDM
 import Control.Monad
 import Data.List
 import Data.Ord
-import Data.Point2d
 import System.Exit
 import Test.QuickCheck
 
@@ -13,6 +12,8 @@ import Test.QuickCheck
 #else
 import Test.QuickCheck.All
 #endif
+
+import Data.Point2d
 
 testElements :: [p] -> [(p, Int)]
 testElements ps = zip ps [0 ..]

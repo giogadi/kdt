@@ -20,6 +20,9 @@ distSqr2d (Point2d x1 y1) (Point2d x2 y2) = let dx = x2 - x1
                                                 dy = y2 - y1
                                             in  dx*dx + dy*dy
 
+dist2d :: Point2d -> Point2d -> Double
+dist2d p p' = sqrt $ distSqr2d p p'
+
 instance Arbitrary Point2d where
     arbitrary = do
         x <- arbitrary

@@ -30,7 +30,9 @@ library
   exposed-modules:     Data.KdMap.Static,
                        Data.KdTree.Static,
                        Data.KdMap.Dynamic,
-                       Data.KdTree.Dynamic
+                       Data.KdTree.Dynamic,
+                       Data.VPMap.Static,
+                       Data.Internal
   -- other-modules:
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
@@ -58,6 +60,19 @@ Test-Suite StaticTest
 Test-Suite DynamicTest
   type:                 exitcode-stdio-1.0
   main-is:              Tests/DynamicTest.hs
+  other-modules:        Data.Point2d
+  hs-source-dirs:       app-src
+  ghc-options:          -Wall -O3
+  build-depends:        base >=4.6 && <5,
+                        kdt -any,
+                        QuickCheck >=2.5,
+                        deepseq >=1.3,
+                        deepseq-generics >=0.1.1.1
+  default-language:     Haskell2010
+
+Test-Suite StaticVPTest
+  type:                 exitcode-stdio-1.0
+  main-is:              Tests/StaticVPTest.hs
   other-modules:        Data.Point2d
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
