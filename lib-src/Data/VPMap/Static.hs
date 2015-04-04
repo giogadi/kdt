@@ -5,6 +5,7 @@ module Data.VPMap.Static
        , assocs
        , size
        , nearest
+       , inRadius
        , isValid
        ) where
 
@@ -99,3 +100,25 @@ nearest (VPMap dist root _) query =
                            else bestAfterNear
         in  bestAfterFar
   in  snd $ go (dist (fst $ _treePoint root) query, _treePoint root) root
+
+inRadius :: Real a => VPMap a p v
+                   -> a
+                   -> p
+                   -> [(p, v)]
+inRadius (VPMap dist root _) radius query =
+  let go Empty acc = acc
+      go (TreeNode near (p, v) nearDist far) acc =
+        let pivotDist = dist p query
+            accAfterPivot = if pivotDist <= radius
+                            then (p, v) : acc
+                            else acc
+            checkNear = pivotDist < nearDist + radius
+            accAfterNear = if checkNear
+                           then go near accAfterPivot
+                           else accAfterPivot
+            checkFar = pivotDist >= nearDist - radius
+            accAfterFar = if checkFar
+                          then go far accAfterNear
+                          else accAfterNear
+        in  accAfterFar
+  in  go root []

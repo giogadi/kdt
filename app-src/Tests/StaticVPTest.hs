@@ -54,6 +54,23 @@ prop_nearestEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     checkNearestEqualToLinear (xs, query)
 
+inRadiusLinear :: [(Point2d, v)] -> Point2d -> Double -> [(Point2d, v)]
+inRadiusLinear xs query radius =
+  filter ((<= radius) . dist2d query . fst) xs
+
+checkInRadiusEqualToLinear :: Double -> ([Point2d], Point2d) -> Bool
+checkInRadiusEqualToLinear radius (ps, query) =
+  let vpm = build dist2d $ testElements ps
+      vpmNear = inRadius vpm radius query
+      linearNear = inRadiusLinear (testElements ps) query radius
+  in  sort vpmNear == sort linearNear
+
+prop_inRadiusEqualToLinear :: Point2d -> Property
+prop_inRadiusEqualToLinear query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    forAll (choose (0.0, 1000.0)) $ \radius ->
+    checkInRadiusEqualToLinear radius (xs, query)
+
 -- Run all tests
 return []
 runTests :: IO Bool
