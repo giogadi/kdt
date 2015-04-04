@@ -2,6 +2,7 @@
 
 import Control.Monad
 import Data.List
+import Data.Ord
 import System.Exit
 import Test.QuickCheck
 
@@ -36,6 +37,22 @@ checkNumElements ps =
 
 prop_validNumElements :: Property
 prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements
+
+nearestLinear :: [(Point2d, v)] -> Point2d -> (Point2d, v)
+nearestLinear xs query =
+  minimumBy (comparing (dist2d query . fst)) xs
+
+checkNearestEqualToLinear :: ([Point2d], Point2d) -> Bool
+checkNearestEqualToLinear (ps, query) =
+  let vpm = build dist2d $ testElements ps
+      vpmNearest = nearest vpm query
+      linearNearest = nearestLinear (testElements ps) query
+  in  vpmNearest == linearNearest
+
+prop_nearestEqualToLinear :: Point2d -> Property
+prop_nearestEqualToLinear query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    checkNearestEqualToLinear (xs, query)
 
 -- Run all tests
 return []

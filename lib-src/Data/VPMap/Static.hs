@@ -4,6 +4,7 @@ module Data.VPMap.Static
        , VPMap
        , assocs
        , size
+       , nearest
        , isValid
        ) where
 
@@ -22,6 +23,12 @@ type DistanceFn a p = p -> p -> a
 
 buildTreeNode :: Real a => DistanceFn a p -> [(p, v)] -> TreeNode a p v
 buildTreeNode _ [] = Empty
+-- Is 0.0 a safe distance here? Want to ensure that queries *always*
+-- check this node if they get here
+--
+-- Also is there a better way to get zero dist?
+buildTreeNode dist [pivot] =
+  TreeNode Empty pivot (dist (fst pivot) (fst pivot)) Empty
 buildTreeNode dist (pivot@(p, _) : dataPoints) =
   let n = length dataPoints
       -- Use first element as pivot because why the hell not
@@ -69,3 +76,26 @@ isValid vpm = isTreeNodeValid (_dist vpm) $ _rootNode vpm
 
 size :: VPMap a p v -> Int
 size = _size
+
+nearest :: Real a => VPMap a p v -> p -> (p, v)
+nearest (VPMap _ Empty _) _ =
+  error "Attempted to call nearest on an empty VPMap."
+nearest (VPMap dist root _) query =
+  let go bestSoFar Empty = bestSoFar
+      go (bestDistSoFar, bestSoFar) (TreeNode near (p, v) nearDist far) =
+        let pivotDist = dist p query
+            checkNear = pivotDist < nearDist + bestDistSoFar
+            better x1@(dist1, _) x2@(dist2, _) = if dist1 < dist2
+                                                 then x1
+                                                 else x2
+            bestAfterPivot =
+              better (pivotDist, (p, v)) (bestDistSoFar, bestSoFar)
+            bestAfterNear = if checkNear
+                            then go bestAfterPivot near
+                            else bestAfterPivot
+            checkFar = pivotDist >= nearDist - (fst bestAfterNear)
+            bestAfterFar = if checkFar
+                           then go bestAfterNear far
+                           else bestAfterNear
+        in  bestAfterFar
+  in  snd $ go (dist (fst $ _treePoint root) query, _treePoint root) root
