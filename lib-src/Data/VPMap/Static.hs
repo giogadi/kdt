@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Data.VPMap.Static
        ( DistanceFn
        , build
@@ -6,12 +8,15 @@ module Data.VPMap.Static
        , size
        , nearest
        , inRadius
+       , kNearest
        , isValid
        ) where
 
 import qualified Data.List as L
 
+import qualified Data.Heap as Q
 import Data.Internal (quickselect)
+import Data.Maybe
 
 data TreeNode a p v = TreeNode { _treeNear :: TreeNode a p v
                                , _treePoint :: (p, v)
@@ -122,3 +127,34 @@ inRadius (VPMap dist root _) radius query =
                           else accAfterNear
         in  accAfterFar
   in  go root []
+
+kNearest :: Real a => VPMap a p v
+                   -> Int
+                   -> p
+                   -> [(p, v)]
+kNearest (VPMap dist root _) numNeighbors query =
+  let go Empty queue = queue
+      go (TreeNode near (p, v) nearDist far) queue =
+        let insertBounded q d x
+              | Q.size q < numNeighbors = Q.insert (d, x) q
+              | otherwise = let ((farthestDist, _), rest) = fromJust $ Q.view q
+                            in  if d < farthestDist
+                                then Q.insert (d, x) rest
+                                else q
+            pivotDist = dist p query
+            queueAfterPivot = insertBounded queue pivotDist (p, v)
+            maxDistAfterPivot = (fst . fst) $ fromJust $ Q.view queueAfterPivot
+            checkNear = Q.size queueAfterPivot < numNeighbors ||
+                        pivotDist < nearDist + maxDistAfterPivot
+            queueAfterNear = if checkNear
+                             then go near queueAfterPivot
+                             else queueAfterPivot
+            maxDistAfterNear = (fst . fst) $ fromJust $ Q.view queueAfterNear
+            checkFar = Q.size queueAfterNear < numNeighbors ||
+                       pivotDist >= nearDist - maxDistAfterNear
+            queueAfterFar = if checkFar
+                            then go far queueAfterNear
+                            else queueAfterNear
+        in  queueAfterFar
+  in  reverse $ map snd $ Q.toAscList $
+        go root (Q.empty :: Q.MaxPrioHeap a (p, v))
