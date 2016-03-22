@@ -34,6 +34,8 @@ module Data.KdMap.Static
        , foldrWithKey
          -- ** Utilities
        , defaultSqrDist
+         -- ** Advanced
+       , TreeNode(..)
          -- ** Internal (for testing)
        , isValid
        ) where
@@ -85,6 +87,10 @@ import qualified Data.Heap as Q
 -- [Point3d {x = 0.0, y = 0.0, z = 0.0}, \"First\"]
 -- @
 
+-- | A node of a /k/-d tree structure that stores a point of type @p@
+-- with axis values of type @a@. Additionally, each point is
+-- associated with a value of type @v@. Note: users typically will not
+-- need to use this type, but we export it just in case.
 data TreeNode a p v = TreeNode { _treeLeft :: TreeNode a p v
                                , _treePoint :: (p, v)
                                , _axisValue :: a

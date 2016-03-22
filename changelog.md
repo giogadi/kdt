@@ -1,3 +1,6 @@
+# 0.2.4
+* Now exporting KdMap.Static.TreeNode to facilitate advanced usage of the library.
+
 # 0.2.3
 * For internal priority queue implementation, use the heap library instead of pqueue library in order to build on ghc 7.10.
 
