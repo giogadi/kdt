@@ -34,7 +34,7 @@ library
   -- other-modules:
   other-extensions:    DeriveGeneric, TemplateHaskell
   ghc-options:         -Wall -O3
-  ghc-prof-options:    -Wall -O3 -fprof-auto
+  -- ghc-prof-options:    -Wall -O3 -fprof-auto
   build-depends:       base >=4.6 && <5,
                        deepseq >=1.3,
                        heap >=1.0.0,
@@ -74,7 +74,7 @@ benchmark KDTBenchmark
   other-modules:        Data.Point2d
   hs-source-dirs:       app-src
   ghc-options:          -Wall -O3
-  ghc-prof-options:     -Wall -O3 -fprof-auto
+  -- ghc-prof-options:     -Wall -O3 -fprof-auto
                         "-with-rtsopts=-p"
   build-depends:        base >=4.6 && <5,
                         kdt -any,
