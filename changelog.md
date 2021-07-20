@@ -1,4 +1,4 @@
-# 0.2.4
+# 0.2.5
 * Fixed a minor compile error under GHC 9 caused by ambiguous use of "singleton".
 
 # 0.2.4
