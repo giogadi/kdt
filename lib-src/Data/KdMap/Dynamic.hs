@@ -49,8 +49,7 @@ import Data.Traversable
 
 import Data.Bits
 import Data.Function
-import Data.List as L hiding (insert, null)
-import qualified Data.List (null)
+import qualified Data.List as L
 
 import Control.DeepSeq
 import Control.DeepSeq.Generics (genericRnf)
@@ -161,7 +160,8 @@ insertPair t = uncurry (insert t)
 nearest :: Real a => KdMap a p v -> p -> (p, v)
 nearest (KdMap ts _ d2 _) query =
   let nearests = map (`KDM.nearest` query) ts
-  in  if   Data.List.null nearests
+  --in  if   Data.List.null nearests
+  in  if L.null nearests
       then error "Called nearest on empty KdMap."
       else L.minimumBy (compare `on` (d2 query . fst)) nearests
 
