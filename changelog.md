@@ -1,4 +1,7 @@
 # 0.2.4
+* Fixed a minor compile error under GHC 9 caused by ambiguous use of "singleton".
+
+# 0.2.4
 * Now exporting KdMap.Static.TreeNode to facilitate advanced usage of the library.
 
 # 0.2.3
