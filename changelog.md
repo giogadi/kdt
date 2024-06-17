@@ -1,3 +1,6 @@
+# 0.2.6
+* Fixed some failing tests (thanks to @nh2)
+
 # 0.2.5
 * Fixed a minor compile error under GHC 9 caused by ambiguous use of "singleton".
 
