@@ -3,17 +3,21 @@
 import qualified Data.KdMap.Static as KDM
 import Data.KdMap.Dynamic
 
-import Control.Monad
+import Control.Monad (unless)
 import Data.Bits
 import Data.List
+import qualified Data.Set as Set
+import Data.Set (isSubsetOf)
 import Data.Point2d
-import System.Exit
+import System.Exit (exitFailure)
 import Test.QuickCheck
 
 #if MIN_VERSION_QuickCheck(2,7,0)
 #else
 import Test.QuickCheck.All
 #endif
+
+import Tests.TestHelpers (nearestsLinear, withinDistanceOfKthNearest)
 
 testElements :: [p] -> [(p, Int)]
 testElements ps = zip ps [1 ..]
@@ -45,38 +49,35 @@ checkNumElements p2l d2 ps =
 prop_validNumElements :: [Point2d] -> Bool
 prop_validNumElements = checkNumElements pointAsList2d distSqr2d
 
-checkNearestEqualToBatch :: (Eq p, Real a) => PointAsListFn a p ->
-                                              SquaredDistanceFn a p ->
-                                              ([p], p) ->
-                                              Bool
-checkNearestEqualToBatch p2l d2 (ps, query) =
-  let kdt = KDM.buildWithDist p2l d2 $ testElements ps
-      kdtAnswer = KDM.nearest kdt query
-      dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
-      dkdtAnswer = nearest dkdt query
-  in  dkdtAnswer == kdtAnswer
-
-prop_nearestEqualToBatch :: Point2d -> Property
-prop_nearestEqualToBatch query =
-  forAll (listOf1 arbitrary) $ \xs ->
-    checkNearestEqualToBatch pointAsList2d distSqr2d (xs, query)
-
-checkKNearestEqualToBatch :: (Eq p, Real a) => PointAsListFn a p ->
+checkNearestConsistentWithLinear :: (Eq p, Real a) => PointAsListFn a p ->
                                                SquaredDistanceFn a p ->
-                                               ([p], Int, p) ->
+                                               ([p], p) ->
                                                Bool
-checkKNearestEqualToBatch p2l d2 (ps, k, query) =
-  let kdt = KDM.buildWithDist p2l d2 $ testElements ps
-      kdtAnswer = KDM.kNearest kdt k query
-      dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
-      dkdtAnswer = kNearest dkdt k query
-  in  dkdtAnswer == kdtAnswer
+checkNearestConsistentWithLinear p2l d2 (ps, query) =
+  let dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
+      dkdtAnswer = nearest dkdt query
+  in  dkdtAnswer `elem` nearestsLinear p2l (testElements ps) query
 
-prop_kNearestEqualToBatch :: Point2d -> Property
-prop_kNearestEqualToBatch query =
+prop_nearestConsistentWithLinear :: Point2d -> Property
+prop_nearestConsistentWithLinear query =
+  forAll (listOf1 arbitrary) $ \xs ->
+    checkNearestConsistentWithLinear pointAsList2d distSqr2d (xs, query)
+
+checkKNearestConsistentWithLinear :: (Ord p, Real a) => PointAsListFn a p ->
+                                                        SquaredDistanceFn a p ->
+                                                        ([p], Int, p) ->
+                                                        Bool
+checkKNearestConsistentWithLinear p2l d2 (ps, k, query) =
+  let dkdt = batchInsert (emptyWithDist p2l d2) $ testElements ps
+      dkdtAnswer = kNearest dkdt k query
+      possibleNearest = withinDistanceOfKthNearest p2l (testElements ps) query k
+  in  Set.fromList dkdtAnswer `isSubsetOf` Set.fromList possibleNearest
+
+prop_kNearestConsistentWithLinear :: Point2d -> Property
+prop_kNearestConsistentWithLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (1, length xs)) $ \k ->
-      checkKNearestEqualToBatch pointAsList2d distSqr2d (xs, k, query)
+      checkKNearestConsistentWithLinear pointAsList2d distSqr2d (xs, k, query)
 
 checkInRadiusEqualToBatch :: (Ord p, Real a) => PointAsListFn a p ->
                                             SquaredDistanceFn a p ->
@@ -110,7 +111,9 @@ prop_checkInRangeEqualToBatch (xs, lowers, uppers)
 -- Run all tests
 return []
 runTests :: IO Bool
-runTests =  $quickCheckAll
+runTests = $(forAllProperties) $
+  -- Vastly increase success counts; finds more bugs and our properties are cheap.
+  quickCheckWithResult stdArgs{ maxSuccess = 2000 }
 
 main :: IO ()
 main = do

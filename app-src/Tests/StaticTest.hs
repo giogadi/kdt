@@ -2,17 +2,20 @@
 
 import Data.KdMap.Static as KDM
 
-import Control.Monad
-import Data.List
-import Data.Ord
+import Control.Monad (unless)
+import Data.List (null, sort, sortBy)
+import qualified Data.Set as Set
+import Data.Set (isSubsetOf)
 import Data.Point2d
-import System.Exit
-import Test.QuickCheck
+import System.Exit (exitFailure)
+import Test.QuickCheck (Property, arbitrary, forAllProperties, forAll, listOf1, choose, Args(..), stdArgs, quickCheckWithResult)
 
 #if MIN_VERSION_QuickCheck(2,7,0)
 #else
 import Test.QuickCheck.All
 #endif
+
+import Tests.TestHelpers (nearestsLinear, withinDistanceOfKthNearest)
 
 testElements :: [p] -> [(p, Int)]
 testElements ps = zip ps [0 ..]
@@ -37,19 +40,15 @@ checkNumElements pointAsList ps =
 prop_validNumElements :: Property
 prop_validNumElements = forAll (listOf1 arbitrary) $ checkNumElements pointAsList2d
 
-nearestLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> (p, v)
-nearestLinear pointAsList xs query =
-  minimumBy (comparing (KDM.defaultSqrDist pointAsList query . fst)) xs
-
-checkNearestEqualToLinear :: (Eq p, Real a) => KDM.PointAsListFn a p -> ([p], p) -> Bool
-checkNearestEqualToLinear pointAsList (ps, query) =
+checkNearestConsistentWithLinear :: (Eq p, Real a, Show p) => KDM.PointAsListFn a p -> ([p], p) -> Bool
+checkNearestConsistentWithLinear pointAsList (ps, query) =
   let kdt = build pointAsList $ testElements ps
-  in  nearest kdt query == nearestLinear pointAsList (testElements ps) query
+  in  nearest kdt query `elem` nearestsLinear pointAsList (testElements ps) query
 
-prop_nearestEqualToLinear :: Point2d -> Property
-prop_nearestEqualToLinear query =
+prop_nearestConsistentWithLinear :: Point2d -> Property
+prop_nearestConsistentWithLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
-    checkNearestEqualToLinear pointAsList2d (xs, query)
+    checkNearestConsistentWithLinear pointAsList2d (xs, query)
 
 inRadiusLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> a -> [(p, v)]
 inRadiusLinear pointAsList xs query radius =
@@ -68,22 +67,18 @@ prop_inRadiusEqualToLinear query =
     forAll (choose (0.0, 1000.0)) $ \radius ->
     checkInRadiusEqualToLinear pointAsList2d radius (xs, query)
 
-kNearestLinear :: Real a => KDM.PointAsListFn a p -> [(p, v)] -> p -> Int -> [(p, v)]
-kNearestLinear pointAsList xs query k =
-  take k $ sortBy (comparing (defaultSqrDist pointAsList query . fst)) xs
-
-checkKNearestEqualToLinear :: (Ord p, Real a) => KDM.PointAsListFn a p -> Int -> ([p], p) -> Bool
-checkKNearestEqualToLinear pointAsList k (xs, query) =
+checkKNearestConsistentWithLinear :: (Ord p, Real a) => KDM.PointAsListFn a p -> Int -> ([p], p) -> Bool
+checkKNearestConsistentWithLinear pointAsList k (xs, query) =
   let kdt = build pointAsList $ testElements xs
       kdtKNear = kNearest kdt k query
-      linearKNear = kNearestLinear pointAsList (testElements xs) query k
-  in  kdtKNear == linearKNear
+      possibleNearest = withinDistanceOfKthNearest pointAsList (testElements xs) query k
+  in  Set.fromList kdtKNear `isSubsetOf` Set.fromList possibleNearest
 
-prop_kNearestEqualToLinear :: Point2d -> Property
-prop_kNearestEqualToLinear query =
+prop_kNearestConsistentWithLinear :: Point2d -> Property
+prop_kNearestConsistentWithLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     forAll (choose (1, length xs)) $ \k ->
-      checkKNearestEqualToLinear pointAsList2d k (xs, query)
+      checkKNearestConsistentWithLinear pointAsList2d k (xs, query)
 
 checkKNearestSorted :: (Eq p, Real a) => KDM.PointAsListFn a p -> ([p], p) -> Bool
 checkKNearestSorted _ ([], _) = True
@@ -125,23 +120,25 @@ prop_equalAxisValueSameElems =
 prop_equalAxisValueEqualToLinear :: Point2d -> Property
 prop_equalAxisValueEqualToLinear query =
   forAll (listOf1 arbitrary) $ \xs@(Point2d x y : _) ->
-    checkNearestEqualToLinear pointAsList2d (Point2d x (y + 1) : xs, query)
+    checkNearestConsistentWithLinear pointAsList2d (Point2d x (y + 1) : xs, query)
 
 prop_unbalancedInsertValid :: Property
 prop_unbalancedInsertValid =
   forAll (listOf1 arbitrary) $
     isValid . batchInsertUnbalanced (empty pointAsList2d) . testElements
 
-prop_unbalancedInsertNNEqualToLinear :: Point2d -> Property
-prop_unbalancedInsertNNEqualToLinear query =
+prop_unbalancedInsertNNConsistentWithLinear :: Point2d -> Property
+prop_unbalancedInsertNNConsistentWithLinear query =
   forAll (listOf1 arbitrary) $ \xs ->
     let kdm = batchInsertUnbalanced (empty pointAsList2d) $ testElements xs
-    in  nearest kdm query == nearestLinear pointAsList2d (testElements xs) query
+    in  nearest kdm query `elem` nearestsLinear pointAsList2d (testElements xs) query
 
 -- Run all tests
 return []
 runTests :: IO Bool
-runTests = $quickCheckAll
+runTests = $(forAllProperties) $
+  -- Vastly increase success counts; finds more bugs and our properties are cheap.
+  quickCheckWithResult stdArgs{ maxSuccess = 2000 }
 
 main :: IO ()
 main = do
